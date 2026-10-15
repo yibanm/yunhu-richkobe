@@ -7,6 +7,7 @@ import { computed, ref, watch } from 'vue'
 import { useCtx } from '../core/useCtx'
 import Icon from './components/Icon.vue'
 import KSlot from './components/KSlot.vue'
+import PalettePop from '../components/PalettePop.vue'
 
 const ctx = useCtx()
 const console_ = ctx.console
@@ -20,6 +21,23 @@ const current = computed({
   set: (v: any) => { console_.state.currentPage = v },
 })
 const pages = computed(() => console_.pages || [])
+
+/**
+ * QQ 式层级分组（按 order 段）：
+ *   消息区 <200（聊天/快捷回复/插件市场/通讯录/表情/机器人/板块）
+ *   工具区 200-799（事件）
+ *   系统区 ≥800（日志/主题/设置/配置/账号）
+ * 组间用分隔线断开，一眼看出功能层级。
+ */
+const groups = computed(() => {
+  const list = pages.value
+  const buckets = [
+    list.filter((p: any) => (p.order ?? 0) < 200),
+    list.filter((p: any) => (p.order ?? 0) >= 200 && (p.order ?? 0) < 800),
+    list.filter((p: any) => (p.order ?? 0) >= 800),
+  ]
+  return buckets.filter((g) => g.length)
+})
 
 /**
  * 当前页对象。
@@ -46,13 +64,17 @@ const wsText = computed(() => ({
     <nav class="rail">
       <div class="rail-logo" title="云湖牢大版"><img src="../../assets/logo.png" alt="" /></div>
       <div class="rail-items">
-        <button v-for="p in pages" :key="p.path"
-                class="rail-btn" :class="{ on: active === p }"
-                :title="p.name" @click="current = p.path">
-          <Icon :name="p.icon" />
-        </button>
+        <template v-for="(g, gi) in groups" :key="gi">
+          <div v-if="gi > 0" class="rail-sep"></div>
+          <button v-for="p in g" :key="p.path"
+                  class="rail-btn" :class="{ on: active === p }"
+                  :title="p.name" @click="current = p.path">
+            <Icon :name="p.icon" />
+          </button>
+        </template>
       </div>
       <div class="rail-foot">
+        <PalettePop />
         <button class="rail-btn" :title="ui.state.theme === 'dark' ? '切换到浅色' : '切换到深色'"
                 @click="ui.toggleTheme()">
           <Icon :name="ui.state.theme === 'dark' ? 'sun' : 'moon'" />

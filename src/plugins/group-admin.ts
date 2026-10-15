@@ -532,7 +532,7 @@ export const groupAdminPlugin = {
         cc.slot({ type: 'global', component: ProfilePanel, order: 41 })
       })
       ctx.console.addEntry((cc: any) => {
-        cc.page({ name: '设置', path: '/settings', icon: 'sliders', order: 860, component: SettingsPage })
+        cc.page({ name: '群设置', path: '/settings', icon: 'sliders', order: 860, component: SettingsPage })
       })
     })
   },

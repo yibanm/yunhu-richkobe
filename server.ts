@@ -24,8 +24,11 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const PORT: number = Number(process.env.PORT || 8902)
 const HOST: string = process.env.HOST || '0.0.0.0'
 const UPSTREAM: string = process.env.UPSTREAM || 'https://chat-go.jwzhd.com'
-const ROOT: string = join(__dirname, 'dist')
-const CONFIG_FILE: string = join(__dirname, 'yunhu.config.yml')
+// 开发态 dist 在仓库根；打包后 server.cjs 位于 dist-server/，dist 与其平级（均已 asarUnpack）
+const ROOT: string = existsSync(join(__dirname, 'dist')) ? join(__dirname, 'dist') : join(__dirname, '..', 'dist')
+// 可写数据目录：桌面打包后 __dirname 在 asar 内只读，由 Electron 注入 YH_DATA_DIR 指向 userData
+const DATA_DIR: string = process.env.YH_DATA_DIR || __dirname
+const CONFIG_FILE: string = join(DATA_DIR, 'yunhu.config.yml')
 
 const DEFAULT_CONFIG = `# 云湖第三方客户端配置
 app:
@@ -232,7 +235,7 @@ const server = http.createServer(serverApp).listen(PORT, HOST, () => {
  * 证书放 ./certs/{key,cert}.pem；没有就用 openssl 自签一张（会提示不安全，手动信任即可）。
  */
 const HTTPS_PORT = Number(process.env.HTTPS_PORT || 8903)
-const CERT_DIR = join(__dirname, 'certs')
+const CERT_DIR = join(DATA_DIR, 'certs')
 try {
   const keyFile = join(CERT_DIR, 'key.pem')
   const certFile = join(CERT_DIR, 'cert.pem')

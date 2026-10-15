@@ -23,6 +23,8 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
+    // 发布包关闭 WebView 调试；排障用屏上信标（main.ts），不依赖调试通道
+    webContentsDebuggingEnabled: false,
     // WebView 过旧时给提示页，而不是黑屏
     minWebViewVersion: 60,
   },

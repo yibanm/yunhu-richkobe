@@ -38,26 +38,48 @@ function iconPath() {
   return path.join(__dirname, '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
 }
 
-/** 拉起服务端：用当前 node（process.execPath）跑 server.ts，避免 PATH 缺失静默失败 */
+/** 拉起服务端。
+ * 打包后 process.execPath 是 Electron 可执行文件而非 Node，直接跑 TS 源码必崩
+ * （Electron 无 type-stripping）——这是旧版桌面端「打不开」的根因。
+ * 正确姿势：构建期用 esbuild 把 server.ts 打成纯 JS（dist-server/server.cjs），
+ * 运行期以 ELECTRON_RUN_AS_NODE=1 让 Electron 二进制当纯 Node 用。
+ * 开发态优先系统 node 直跑 TS（Node ≥ 22.6 原生 type-stripping）。
+ */
 function startServer() {
   const dir = serverDir()
   const tsEntry = path.join(dir, 'server.ts')
-  const jsEntry = path.join(dir, 'dist-server', 'server.cjs')
+  // 打包后 server.cjs 被 asarUnpack 解包为真实文件（asar 内路径不能作 node 入口）
+  const unpacked = path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist-server', 'server.cjs')
+  const jsEntry = fs.existsSync(unpacked) ? unpacked : path.join(dir, 'dist-server', 'server.cjs')
 
-  let cmd = process.execPath || 'node'
+  let cmd
   let args = []
-  if (fs.existsSync(tsEntry)) {
-    args = [tsEntry]
-  } else if (fs.existsSync(jsEntry)) {
+  let extraEnv = {}
+  if (fs.existsSync(jsEntry)) {
+    cmd = process.execPath || 'node'
     args = [jsEntry]
+    extraEnv.ELECTRON_RUN_AS_NODE = '1'
+  } else if (fs.existsSync(tsEntry)) {
+    cmd = 'node'
+    args = [tsEntry]
   } else {
     dialog.showErrorBox('启动失败', '找不到服务端入口（server.ts / dist-server/server.cjs）')
     return false
   }
 
   serverProcess = spawn(cmd, args, {
-    cwd: dir,
-    env: { ...process.env, PORT: String(PORT), HTTPS_PORT: String(HTTPS_PORT), HOST: '127.0.0.1' },
+    // cwd 必须是真实磁盘目录：resources/app 在 asar 内是虚拟路径，
+    // libuv 原生 chdir 不认 → spawn ENOENT
+    cwd: fs.existsSync(jsEntry) ? path.dirname(jsEntry) : dir,
+    env: {
+      ...process.env,
+      ...extraEnv,
+      PORT: String(PORT),
+      HTTPS_PORT: String(HTTPS_PORT),
+      HOST: '127.0.0.1',
+      // 打包后 __dirname 在 asar 内只读：证书/配置改写到 userData
+      YH_DATA_DIR: app.getPath('userData'),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 

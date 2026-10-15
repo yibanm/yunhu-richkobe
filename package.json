@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "preflight": "node scripts/preflight.mjs",
-    "build": "node scripts/preflight.mjs && vite build",
+    "build": "node scripts/preflight.mjs && vite build && node scripts/build-server.mjs",
     "preview": "vite preview",
     "serve": "node server.ts",
     "typecheck": "vue-tsc --noEmit",

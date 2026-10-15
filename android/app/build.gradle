@@ -24,10 +24,12 @@ android {
             signingConfig signingConfigs.debug
         }
     }
-    // 发布产物仅 arm64（与发布命名 yunhulaoda-<版本>-android-arm64.apk 对齐）
+    // 发布产物仅 arm64（与发布命名 yunhulaoda-<版本>-android-arm64.apk 对齐）；
+    // debug 包不限 ABI，便于在 x86_64 模拟器上验证
+    def isReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
     splits {
         abi {
-            enable true
+            enable isReleaseBuild
             reset()
             include 'arm64-v8a'
             universalApk false

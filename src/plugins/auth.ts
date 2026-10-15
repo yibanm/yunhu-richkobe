@@ -89,7 +89,7 @@ export const authPlugin = {
     /* ---- 控制台扩展：账号页面 ---- */
     ctx.inject(['console'], (ctx) => {
       ctx.console.addEntry((cc) => {
-        cc.page({ name: '账号', path: '/account', icon: 'userCircle', order: 950, component: AccountPage })
+        cc.page({ name: '我的账号', path: '/account', icon: 'userCircle', order: 950, component: AccountPage })
       })
     })
   },

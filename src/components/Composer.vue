@@ -14,10 +14,14 @@ const ta = ref(null)
 
 /**
  * 输入区按钮来自插件注册表 ctx.chat.composerOf('composer')：
- * 「文本/Markdown/HTML」由 chat 插件贡献，「快捷回复」由 quickreply 贡献。
- * 卸载哪个插件，对应按钮就消失。
+ * 「文本/Markdown/HTML/图片/文件…」功能项由 chat/stickers 插件贡献，
+ * 「快捷回复」由 quickreply 贡献。卸载哪个插件，对应按钮就消失。
+ * 快捷回复与功能项**分层**：功能项一行（工具条），快捷回复单独一行（chips），
+ * 混在一排时快捷回复会被功能项淹没（QQ 也是分层的）。
  */
-const barItems = computed(() => chat.composerOf?.('composer') || [])
+const allBarItems = computed(() => chat.composerOf?.('composer') || [])
+const barItems = computed(() => allBarItems.value.filter((it: any) => it.kind !== 'quick'))
+const quickItems = computed(() => allBarItems.value.filter((it: any) => it.kind === 'quick'))
 
 /**
  * 输入处理：
@@ -117,12 +121,48 @@ async function onPick(e: any, kind: 'image' | 'file') {
 function onKey(e) {
   if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); submit() }
 }
+
+/**
+ * 剪贴板粘贴：图片 / 视频 / 任意文件直接上传发送（QQ 同款体验）。
+ * 纯文本粘贴走浏览器默认行为，不拦截。
+ */
+async function onPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  for (const item of Array.from(items)) {
+    if (item.kind !== 'file') continue
+    const f = item.getAsFile()
+    if (!f) continue
+    e.preventDefault()
+    const media: 'image' | 'video' | 'file' =
+      f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : 'file'
+    uploading.value = true
+    try {
+      ctx.ui?.toast('粘贴上传中…' + (f.name || media), 'info', 1500)
+      const { url } = await ctx.api.uploadAndUrl(f, media === 'video' ? 'file' : media)
+      if (media === 'image') await chat.sendMedia([h.image(url)])
+      else if (media === 'video') await chat.sendMedia([h.video(url)])
+      else await chat.sendMedia([h.file(url, f.name || '粘贴的文件', f.size)])
+      ctx.ui?.toast('已发送', 'success', 1500)
+    } catch (err: any) {
+      ctx.ui?.toast('粘贴上传失败：' + err.message, 'error')
+    } finally {
+      uploading.value = false
+    }
+    return
+  }
+}
 </script>
 
 <template>
   <div class="composer">
     <QuoteBar />
-    <!-- 输入区按钮：全部由插件注册（chat.composer），这里只渲染成一行，可横向滑动 -->
+    <!-- 快捷回复层：独立一行 chips，与功能工具条分层 -->
+    <div v-if="quickItems.length" class="quick-row">
+      <button v-for="it in quickItems" :key="it.id" class="ghost tiny quick-chip"
+              @click="onBar(it)">{{ it.label }}</button>
+    </div>
+    <!-- 功能工具条层：文本/Markdown/图片/文件/语音… -->
     <div class="bar-row">
       <button v-for="it in barItems" :key="it.id" class="ghost tiny"
               :class="{ on: it.kind === 'type' && kind === it.value }"
@@ -142,7 +182,7 @@ function onKey(e) {
 
     <div class="line">
       <textarea ref="ta" v-model="text" :placeholder="placeholder"
-                @input="onInput" @keydown="onKey"></textarea>
+                @input="onInput" @keydown="onKey" @paste="onPaste"></textarea>
       <button :disabled="chat.state.sending || !text.trim()" @click="submit">
         {{ chat.state.sending ? '…' : '发送' }}
       </button>
@@ -167,6 +207,14 @@ function onKey(e) {
 }
 .bar-row::-webkit-scrollbar { display: none; }
 .bar-row > * { flex: 0 0 auto; }
+/* 快捷回复层：圆角 chips，视觉上和工具条区分 */
+.quick-row {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;
+}
+.quick-chip {
+  border-radius: 999px; background: var(--acc-soft); border-color: transparent; color: var(--acc);
+}
+.quick-chip:hover { background: var(--acc); color: #fff; }
 .tiny { padding: 3px 10px; font-size: 12px; border-radius: 7px; }
 .bar-row .on { background: var(--acc); color: #fff; border-color: transparent; }
 .line { display: flex; gap: 9px; align-items: flex-end; }

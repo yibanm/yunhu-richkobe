@@ -10,15 +10,16 @@ directories:
   buildResources: build
 files:
   - dist/**
+  - dist-server/**
   - electron/**
-  - server.ts
-  - satori.ts
-  - satori-ws.ts
-  - webdav.ts
   - package.json
   - node_modules/**
 asarUnpack:
   - node_modules/**/*.node
+  # 服务端入口与静态资源必须以真实文件存在：ELECTRON_RUN_AS_NODE 的
+  # 纯 node 进程不走 asar fs 补丁
+  - dist-server/**
+  - dist/**
 win:
   icon: build/icon.ico
   # 便携 zip 用平台级命名；NSIS 安装版在 nsis 段覆盖加 -setup

@@ -135,13 +135,15 @@ def main() -> None:
         '</adaptive-icon>\n', encoding='utf-8')
     on_bg(src, 0.22).save(res / 'drawable/ic_launcher_foreground.png')
 
-    # 启动页窗口背景：品牌底色 + 居中 logo（消除 WebView 加载期黑屏观感）
+    # 启动页窗口背景：品牌底色 + 居中位图（<bitmap> 不能引用自适应图标 XML，
+    # 否则启动时 Resources$NotFoundException 崩溃）
+    rounded(resize(src, 288), 0.18).save(res / 'drawable/splash_logo.png')
     (res / 'drawable/splash_background.xml').write_text(
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n'
         '    <item android:drawable="@color/ic_launcher_background" />\n'
         '    <item android:gravity="center">\n'
-        '        <bitmap android:src="@mipmap/ic_launcher" android:gravity="center" />\n'
+        '        <bitmap android:src="@drawable/splash_logo" android:gravity="center" />\n'
         '    </item>\n'
         '</layer-list>\n', encoding='utf-8')
 
