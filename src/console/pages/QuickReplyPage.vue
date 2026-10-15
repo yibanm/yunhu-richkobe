@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /** 快捷回复管理页（由 quickreply 插件注册；卸载插件后本页随之消失） */
-import { inject, ref } from 'vue'
+import { ref } from 'vue'
+import { useCtx } from '../../core/useCtx'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const qr = ctx.quickreply
 const ui = ctx.ui
 const draft = ref('')

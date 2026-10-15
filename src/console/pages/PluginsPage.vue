@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /** 插件管理页（控制台内置页面） */
-import { inject, ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useCtx } from '../../core/useCtx'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
 import Icon from '../components/Icon.vue'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const app = ctx.app
 const ui = ctx.ui
 const console_ = ctx.console

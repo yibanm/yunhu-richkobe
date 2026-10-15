@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material 3 配色：色相沿用原仓库色系（acc #5a8cf8 / bg #17181f / card #1e202a） -->
+<resources>
+    <color name="colorPrimary">#5A8CF8</color>
+    <color name="colorPrimaryDark">#17181F</color>
+    <color name="colorAccent">#5A8CF8</color>
+
+    <!-- M3 baseline (dark) -->
+    <color name="md_theme_primary">#5A8CF8</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#232634</color>
+    <color name="md_theme_onPrimaryContainer">#D6D9E0</color>
+    <color name="md_theme_surface">#17181F</color>
+    <color name="md_theme_onSurface">#D6D9E0</color>
+    <color name="md_theme_surfaceVariant">#1E202A</color>
+    <color name="md_theme_onSurfaceVariant">#868B9C</color>
+    <color name="md_theme_outline">#2B2D38</color>
+    <color name="md_theme_error">#F2635F</color>
+</resources>

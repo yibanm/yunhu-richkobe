@@ -4,9 +4,9 @@
  * 数据来自 ui 服务的 state.toasts；任何插件调 ctx.ui.toast(...) 都会到这里，
  * 所以它必须挂在最外层（App.vue），不能放在某个页面里。
  */
-import { inject } from 'vue'
+import { useCtx } from '../core/useCtx'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const ui = ctx.ui
 </script>
 

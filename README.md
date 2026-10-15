@@ -1,16 +1,33 @@
-# 云湖第三方客户端 · Vue3 + Cordis 内核 + Koishi 式控制台 + Satori 消息层
+# 云湖牢大版
+
+> 云湖第三方客户端 · **牢大版** · Vue3 + 真 cordis 插件内核 + Koishi 式控制台 + Satori 消息层
+> 三端同源：Web · Windows 桌面（Electron / Fluent 设计）· Android（Capacitor / Material 3）
 
 > 仅供 **学习交流**。接口来自社区公开整理：
 > [yh-Tpdev/yhchatAPI](https://github.com/yh-Tpdev/yhchatAPI)（在线 <https://yh-api.yyyyt.top>）与
 > [yhwiki](https://codeberg.org/ybr/yhwiki)。只使用 **你自己的账号 token**。
 
-**全量 TypeScript，`tsc --noEmit` 0 error。**
+> 🔱 **Fork 来源**：本仓库 fork 自上游 [FLY1919](https://github.com/FLY1919)/[yunhu-vue](https://github.com/FLY1919/yunhu-vue)，
+> 在其 Web 核心之上重建了 Windows 桌面壳与 Android 壳、重做了双端 UI 设计系统并整顿了工程质量。
+
+**全量 TypeScript，`vue-tsc --noEmit` 0 error。**
 
 > 📘 想写插件？看 [`docs/plugin-development.md`](docs/plugin-development.md) —— 从最小插件到「撤回消息」完整案例。
 
 ---
 
-## 一、三层结构
+## 一、平台与获取
+
+| 平台 | 形态 | 产物 |
+|---|---|---|
+| Windows x64 | Electron 桌面应用（Fluent / WinUI 3 设计语言） | `yunhulaoda-<版本>-windows-x64-setup.exe`（NSIS 安装版）/ `yunhulaoda-<版本>-windows-x64.zip`（便携版） |
+| Android arm64 | Capacitor 壳 + WebView（Material 3 主题） | `yunhulaoda-<版本>-android-arm64.apk` |
+| Web | 纯浏览器 / 自托管 | `npm run build && npm run serve` |
+
+安装包与 APK 见 [Releases](../../releases)。桌面版内置 Node 反代服务端，双击即用，无需额外后端；
+Android 版打开后在「设置 → API 基址」确认链路即可使用。
+
+## 二、三层结构
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -83,13 +100,30 @@ ctx.inject(['console'], (ctx) => {
 
 左侧导航**完全由已注册页面生成**，插件装卸即时增减。页面组件用 `<k-layout>` / `<k-card>` / `<k-slot>` 组装。
 
-## 二、配置文件（对标 koishi.yml）
+## 三、设计系统
+
+桌面端采用 **Fluent / WinUI 3 设计语言**，移动端（Android / 窄屏）适配 **Material 3**；
+色系沿用原仓库（强调色 `#5a8cf8`、暗色底 `#17181f`），在其上建立清晰层级：
+
+- **层叠表面**：三级阴影令牌（`--elev-1/2/3`）+ 卡片悬浮抬升，暗色下「越高越亮」
+- **导航层级**：NavigationView 式左栏 + 选中指示条动画；页面切换入场动效
+- **分区与卡片**：内容区按卡片/分区组织，标题栏亚克力模糊吸顶
+- **交互反馈**：按钮按压缩放、输入框 Fluent 底部强调线、Toast 滑入、消息入场动画
+- **移动端**：触控目标 ≥ 44px、底部安全区内边距、抽屉式会话列表
+
+品牌图标（见下图）覆盖全部可见位置：Windows 安装器图标 / 安装界面品牌图 / 快捷方式 / 任务栏与窗口图标 / 系统托盘 / Android 启动图标与自适应图标 / 启动页 / 应用内 logo。
+
+<p align="center">
+  <img src="assets/brand.jpg" alt="云湖牢大版" width="360" />
+</p>
+
+## 四、配置文件（对标 koishi.yml）
 
 `yunhu.config.yml`（服务端 `/config` 读写，控制台「配置」页可视化编辑）
 
 ```yaml
 app:
-  title: 云湖 · 第三方客户端
+  title: 云湖牢大版
   theme: dark
   pollMs: 4000
 plugins:
@@ -107,33 +141,22 @@ plugins:
 - 「保存」写回服务器文件；「应用并重载插件」按新配置重挂载并自动恢复登录态
 - 实测：改 `plugins.quickreply.items` → 应用 → 聊天页按钮条立刻变化
 
-## 三、插件清单
+## 五、功能
 
-| 插件 | 提供服务 | 控制台页面 | 依赖 |
-|---|---|---|---|
-| config | `config` | 配置 | — |
-| logger | `logger` | 日志（含菜单动作） | — |
-| ui | `ui` | — | — |
-| theme | `theme` | 主题（配色/壁纸/圆角） | ui |
-| console | `console` | 插件 | — |
-| api | `api` | — | — |
-| auth | `auth` | 账号 | api |
-| adapter | `bots` `satori` | 事件 | api, auth |
-| chat | `chat` | 聊天 + 状态栏插槽 | api, auth |
-| ws | `ws` | — | api, auth |
-| message-actions | `messageActions` | 消息操作（撤回/多选/转发/引用/全选） | chat, ui |
-| group-admin | `group` | 成员列表 / 踢出 / 禁言 / 看板 / 记录搜索 | api, chat, ui |
-| quickreply | `quickreply` | 快捷回复 | ui, chat |
+登录（邮箱/Token）· 会话（未读/@/搜索）· 消息收发 · **消息操作（撤回/多选/全选/转发/引用 + 右键菜单）** · **群管理（成员/踢出/禁言/看板/记录搜索）** · **A2UI v0.9** · **视频/语音** · **WebSocket 实时** · **资源代理**（补 `Referer: http://myapp.jwznb.com`，解锁图片/表情/音频/视频/文件/头像）· **富消息渲染**（文本/图片/Markdown/HTML/文件/表单/文章/表情/语音/通话/A2UI，**统一走元素树**）· 浅色深色 · 移动端抽屉 · **桌面托盘/单实例** · **启动失败可视错误页（不再黑屏白屏）**
 
-## 四、功能
-
-登录（邮箱/Token）· 会话（未读/@/搜索）· 消息收发 · **消息操作（撤回/多选/全选/转发/引用 + 右键菜单）** · **群管理（成员/踢出/禁言/看板/记录搜索）** · **A2UI v0.9** · **视频/语音** · **WebSocket 实时** · **资源代理**（补 `Referer: http://myapp.jwznb.com`，解锁图片/表情/音频/视频/文件/头像）· **富消息渲染**（文本/图片/Markdown/HTML/文件/表单/文章/表情/语音/通话/A2UI，**统一走元素树**）· 浅色深色 · 移动端抽屉
-
-## 五、目录
+## 六、目录
 
 ```
 yunhu-vue/
 ├── server.ts                 # 托管 + /api + /res + /config（Node 24 直接跑 TS）
+├── electron/                 # Windows 桌面壳（主进程 / preload / 托盘图标）
+├── electron-builder.yml      # NSIS 安装版 + 便携 zip 打包配置
+├── capacitor.config.ts       # Android 壳配置（appId=com.yunhu.kobe）
+├── android/                  # Capacitor Android 工程（M3 主题，入库可复现构建）
+├── build/                    # 品牌图标源（icon.ico / icon.png / NSIS 位图）
+├── assets/                   # README 插图 / 应用内 logo
+├── scripts/gen_icons.py      # 从一张方图生成全平台图标
 ├── docs/plugin-development.md   # ★ 插件开发指南（以撤回为完整案例）
 ├── yunhu.config.yml
 ├── vite.config.ts
@@ -149,20 +172,37 @@ yunhu-vue/
 ├── test-kernel.mjs test.mjs test-ws.mjs
 ```
 
-## 六、运行
+## 七、运行与构建
 
 ```bash
 npm install
-npm run dev                      # 开发
-npm run build && npm run serve   # 生产：HOST=:: PORT=8902 node server.ts
+npm run dev                      # Web 开发
+npm run build && npm run serve   # Web 生产：HOST=:: PORT=8902 node server.ts
 npm run typecheck                # vue-tsc
 npm run test:kernel              # 内核语义测试（无需账号）
 YH_EMAIL=… YH_PASS=… npm run test:api && npm run test:ws
 ```
 
+桌面版（Windows）：
+
+```bash
+npm run desktop                  # 开发态跑 Electron 壳
+npm run desktop:pack             # 产出 release/yunhulaoda-<版本>-windows-x64-setup.exe / .zip
+```
+
+Android 版：
+
+```bash
+npm run android:sync             # 构建 Web + 同步到 android 工程
+npm run android:apk              # 产出 android/app/build/outputs/apk/release/app-release.apk
+```
+
+> 本地构建环境：Node ≥ 22；Android 需 JDK 21（Capacitor 8 要求）+ Android SDK（compileSdk 36）。
+> 云端构建（GitHub Actions）与本地构建产物一致，workflow 见 `.github/workflows/build-release.yml`。
+
 调试：控制台里 `__yunhu` 就是根 Context，可查 `__yunhu.app.list()` / `__yunhu.console.state.pages`。
 
-## 七、加一个带页面 + 消费消息的插件
+## 八、加一个带页面 + 消费消息的插件
 
 ```ts
 // src/plugins/hello.ts
@@ -211,10 +251,9 @@ IPv4:  http://192.168.1.100:8902
 | `/satori/v1/ws` | Satori 事件推送（WebSocket，手写 RFC6455） |
 | `/config` | 配置文件读写 |
 
-
 ---
 
-## 六、控制台页面一览（13 个，全部由插件注册）
+## 九、控制台页面一览（13 个，全部由插件注册）
 
 | 页面 | 提供插件 | 说明 |
 |---|---|---|
@@ -232,7 +271,7 @@ IPv4:  http://192.168.1.100:8902
 | 插件 | console | 插件清单 + 热装载/卸载（真 cordis Fiber）|
 | 账号 | auth | 登录态 / 连接 / 外观 |
 
-## 七、插件清单（21 个）
+## 十、插件清单（21 个）
 
 ```
 内核/基础   cfg  logger  ui  theme  console  api  http  auth
@@ -244,22 +283,23 @@ IPv4:  http://192.168.1.100:8902
 
 装/卸一个插件，它注册的**服务 / 控制台页面 / 导航项 / 聊天菜单 / 输入区按钮 / 插槽 / 气泡渲染器**会一起消失或恢复 —— 这是 Koishi 式的核心体验。
 
-## 八、脚本
+## 十一、脚本
 
 ```bash
 npm run preflight     # 部署前自检（模板 import / 本地引用 / 服务声明），已接进 build
 node scripts/api-coverage.mjs     # 生成 docs/api-coverage.md（接口覆盖情况）
 npx tsx scripts/test-a2ui.mts     # A2UI 解析器单测（5 种形态）
+py scripts/gen_icons.py <方图>    # 从一张方图重生成全平台品牌图标
 bash deploy.sh        # 类型检查 → 自检 → 构建 → 校验资源 → 同步 → 冒烟测试
 ```
 
-## 九、文档
+## 十二、文档
 
 - [`docs/plugin-development.md`](docs/plugin-development.md) —— 插件开发指南（从最小插件到完整案例 + 富消息 + 常见坑清单 + ctx.session/ctx.event）
 - [`docs/cordis-notes.md`](docs/cordis-notes.md) —— 真 cordis 的实测笔记（哪些原生有、哪些坑）
 - [`docs/api-coverage.md`](docs/api-coverage.md) —— 云湖接口覆盖情况（已实现 94 / 文档 234 / 待实现 141）
 
-## 十、两个端口
+## 十三、两个端口
 
 ```
 http://[2409:8a4c:9e33:4570::9]:8902    日常访问（双栈 HOST=::）
@@ -268,3 +308,4 @@ https://[2409:8a4c:9e33:4570::9]:8903   手机录音/录像用（安全上下文
 
 > 浏览器只在**安全上下文**（https / localhost）才给 `navigator.mediaDevices`，
 > 所以纯 http 打开时手机上连录音权限弹窗都不会出。服务端会自动自签证书。
+> 注：仓库不再内置证书私钥（`certs/` 已移除并忽略），服务端启动时自动生成自签证书。

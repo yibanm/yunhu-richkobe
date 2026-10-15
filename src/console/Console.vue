@@ -3,11 +3,12 @@
  * 控制台外壳（对标 Koishi Console）
  *   左侧导航栏按「已注册页面」动态生成 —— 插件装载/卸载，导航项即时增减
  */
-import { inject, computed, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useCtx } from '../core/useCtx'
 import Icon from './components/Icon.vue'
 import KSlot from './components/KSlot.vue'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const console_ = ctx.console
 const ui = ctx.ui
 const ws = ctx.ws
@@ -43,7 +44,7 @@ const wsText = computed(() => ({
 <template>
   <div class="console">
     <nav class="rail">
-      <div class="rail-logo" title="云湖第三方客户端">云</div>
+      <div class="rail-logo" title="云湖牢大版"><img src="../../assets/logo.png" alt="" /></div>
       <div class="rail-items">
         <button v-for="p in pages" :key="p.path"
                 class="rail-btn" :class="{ on: active === p }"

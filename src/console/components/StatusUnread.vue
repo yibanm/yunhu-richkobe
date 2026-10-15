@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /** 状态栏左侧插槽：未读总数（由 chat 插件注册） */
-import { inject, computed } from 'vue'
+import { computed } from 'vue'
+import { useCtx } from '../../core/useCtx'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const chat = ctx.chat
 
 const unread = computed(() =>

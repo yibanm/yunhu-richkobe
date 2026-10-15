@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /** 账号页 */
-import { inject, computed } from 'vue'
+import { computed } from 'vue'
+import { useCtx } from '../../core/useCtx'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
 import { resUrl } from '../../core/res.js'
 import { fallbackAvatar } from '../../core/util.js'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const auth = ctx.auth
 const api = ctx.api
 const ws = ctx.ws
@@ -23,7 +24,7 @@ const wsText = computed(() => ({
     <KCard>
       <div class="account">
         <img :src="user.avatar ? resUrl(user.avatar) : fallbackAvatar(user.name)"
-             @error="e => (e.target.src = fallbackAvatar(user.name))" alt="" />
+             @error="e => ((e.target as HTMLImageElement).src = fallbackAvatar(user.name))" alt="" />
         <div class="acc-main">
           <div class="acc-name">{{ user.name }} <em v-if="user.vip">VIP</em></div>
           <div class="dim small">ID {{ user.id }} · 🪙 {{ Math.round(user.coin || 0) }}</div>

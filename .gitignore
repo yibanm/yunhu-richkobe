@@ -6,3 +6,20 @@ dist/
 docs-site/.vitepress/dist
 docs-site/.vitepress/cache
 core.*
+
+# 打包产物
+release/
+android/app/build/
+android/.gradle/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+# cap sync 从 dist 生成的 web 资源（CI/本地 android:sync 会重建，不入库）
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+
+# 本地环境 / 敏感物
+local.properties
+*.keystore
+*.jks
+certs/
+*.pem

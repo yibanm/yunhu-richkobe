@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** 页面布局：标题栏 + 菜单动作 + 内容区（对标 k-layout） */
-import { inject, computed } from 'vue'
+import { computed } from 'vue'
+import { useCtx } from '../../core/useCtx'
 import KSlot from './KSlot.vue'
 
 const props = defineProps({
@@ -17,7 +18,7 @@ const sname = computed(() => {
   return (props.title || 'page').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
 })
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const items = computed(() => (props.menu && ctx.console ? ctx.console.state.menus[props.menu] || [] : []))
 function run(id) { ctx.console?.run(id) }
 </script>

@@ -4,9 +4,10 @@
  * 成功后会写 localStorage（yh.token），由 auth 插件负责持久化与自动恢复。
  * 页面上显示的 API 基址来自 api 服务，方便换部署环境时确认走的是哪条链路。
  */
-import { inject, ref } from 'vue'
+import { ref } from 'vue'
+import { useCtx } from '../core/useCtx'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const auth = ctx.auth
 const api = ctx.api
 
@@ -29,7 +30,10 @@ const doToken = () => withBusy(() => auth.loginWithToken(token.value))
 
 <template>
   <div class="login-card">
-    <h1>云湖 · 第三方 Web 客户端</h1>
+    <div class="login-brand">
+      <img src="../../assets/logo.png" alt="云湖牢大版" />
+    </div>
+    <h1>云湖牢大版</h1>
     <div class="sub">Vue 3 + Cordis 风格插件架构 · 仅供学习交流</div>
 
     <div class="tabs">

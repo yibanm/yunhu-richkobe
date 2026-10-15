@@ -9,7 +9,7 @@ const ctx = inject<any>('ctx')
 const theme = ctx.theme
 const ui = ctx.ui
 
-const groups = computed(() => [...new Set(theme.presets.map((p: any) => p.group || '内置'))])
+const groups = computed(() => [...new Set<string>(theme.presets.map((p: any) => p.group || '内置'))])
 
 const accent = computed({
   get: () => theme.state.accent || theme.current().accent,

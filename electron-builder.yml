@@ -1,0 +1,46 @@
+# electron-builder 打包配置 —— 云湖牢大版桌面客户端
+# 产物命名（Release 规范）：
+#   yunhulaoda-<版本>-windows-x64-setup.exe   （NSIS 安装版）
+#   yunhulaoda-<版本>-windows-x64.zip         （便携版）
+appId: com.yunhu.kobe.desktop
+productName: 云湖牢大版
+copyright: Copyright © 2026 yibanm
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - electron/**
+  - server.ts
+  - satori.ts
+  - satori-ws.ts
+  - webdav.ts
+  - package.json
+  - node_modules/**
+asarUnpack:
+  - node_modules/**/*.node
+win:
+  icon: build/icon.ico
+  # 便携 zip 用平台级命名；NSIS 安装版在 nsis 段覆盖加 -setup
+  artifactName: yunhulaoda-${version}-windows-${arch}.${ext}
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 云湖牢大版
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  installerSidebar: build/installer-sidebar.bmp
+  uninstallerSidebar: build/installer-sidebar.bmp
+  installerHeader: build/installer-header.bmp
+  deleteAppDataOnUninstall: false
+  artifactName: yunhulaoda-${version}-windows-${arch}-setup.${ext}
+publish: null

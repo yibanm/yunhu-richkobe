@@ -8,11 +8,12 @@
  *   · 「未读」样式走 .has-unread（名字加重 + 小圆点），不再用整块红底，减少颜色噪音
  *   · 点头像 = 看自己的资料（走 group.openProfile）
  */
-import { inject, computed, ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useCtx } from '../core/useCtx'
 import { fmtTime, fallbackAvatar } from '../core/util.js'
 import { resUrl } from '../core/res.js'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const auth = ctx.auth
 const chat = ctx.chat
 
@@ -53,7 +54,7 @@ function openMe() {
     <div class="me">
       <img class="me-av" :src="auth.state.user?.avatar ? resUrl(auth.state.user.avatar) : fallbackAvatar(auth.state.user?.name)" alt=""
            title="查看我的资料" @click="openMe"
-           @error="e => (e.target.src = fallbackAvatar(auth.state.user?.name))" />
+           @error="e => ((e.target as HTMLImageElement).src = fallbackAvatar(auth.state.user?.name))" />
       <div class="info">
         <div class="name">{{ auth.state.user?.name }}</div>
         <div class="sub">ID {{ auth.state.user?.id }}</div>
@@ -88,7 +89,7 @@ function openMe() {
           <li v-for="c in g.items" :key="c.id" :class="{ active: chat.state.current?.id === c.id, 'has-unread': !!c.unread }"
               @click="open(c)" @contextmenu.prevent="assign(c)">
             <img :src="c.avatar ? resUrl(c.avatar) : fallbackAvatar(c.name)" alt=""
-                 @error="e => (e.target.src = fallbackAvatar(c.name))" />
+                 @error="e => ((e.target as HTMLImageElement).src = fallbackAvatar(c.name))" />
             <div class="mid">
               <div class="top"><span class="cname">{{ c.at ? '[有人@我] ' : '' }}{{ c.name }}</span><span class="time">{{ fmtTime(c.ts) }}</span></div>
               <div class="prev">{{ c.preview }}</div>
@@ -101,7 +102,7 @@ function openMe() {
       <li v-for="c in sections.ungrouped" :key="c.id" :class="{ active: chat.state.current?.id === c.id, 'has-unread': !!c.unread }"
           @click="open(c)" @contextmenu.prevent="assign(c)">
         <img :src="c.avatar ? resUrl(c.avatar) : fallbackAvatar(c.name)" alt=""
-             @error="e => (e.target.src = fallbackAvatar(c.name))" />
+             @error="e => ((e.target as HTMLImageElement).src = fallbackAvatar(c.name))" />
         <div class="mid">
           <div class="top">
             <span class="cname">{{ c.at ? '[有人@我] ' : '' }}{{ c.name }}</span>

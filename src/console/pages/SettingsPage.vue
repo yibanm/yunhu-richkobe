@@ -27,6 +27,15 @@ const ui = ctx.ui
 
 const busy = ref(false)
 
+/* 性别选项（/v1/user/save-user-data 的 gender 字段：1 男 2 女 3 保密） */
+const GENDERS = [
+  { v: 1, n: '男' },
+  { v: 2, n: '女' },
+  { v: 3, n: '保密' },
+]
+/* 当前会话（群设置区块用） */
+const cur = computed(() => chat.state.current)
+
 /* ============ 账号信息 ============ */
 const stats = ref<any>({})          // /v1/user/get-user 的结果
 const meInfo = ref<any>({})         // /v1/user/info 的结果

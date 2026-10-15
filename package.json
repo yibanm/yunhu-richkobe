@@ -3,7 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "云湖第三方 Web 客户端 · Vue3 + 真 cordis 插件内核 + Satori 协议 + WebDAV 网关（仅供学习交流）",
+  "main": "electron/main.cjs",
+  "description": "云湖牢大版 · 第三方客户端 · Vue3 + 真 cordis 插件内核 + Satori 协议 + WebDAV 网关（仅供学习交流）",
+  "author": "yibanm",
   "scripts": {
     "dev": "vite",
     "preflight": "node scripts/preflight.mjs",
@@ -13,7 +15,12 @@
     "typecheck": "vue-tsc --noEmit",
     "test:kernel": "tsx test-kernel.mjs",
     "test:api": "tsx test.mjs",
-    "test:ws": "tsx test-ws.mjs"
+    "test:ws": "tsx test-ws.mjs",
+    "icons": "py scripts/gen_icons.py",
+    "desktop": "electron electron/main.cjs",
+    "desktop:pack": "npm run build && electron-builder --publish never",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "cd android && gradlew.bat assembleRelease"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.2",
@@ -25,13 +32,18 @@
     "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.6.4",
     "@vitejs/plugin-vue": "^5.2.1",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.0.12",
     "js-yaml": "^5.4.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vite": "^6.0.7",
-    "vitepress": "^1.6.4"
+    "vitepress": "^1.6.4",
+    "vue-tsc": "^3.1.1"
   }
 }

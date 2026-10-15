@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { inject, ref, nextTick, computed } from 'vue'
+import { ref, nextTick, computed } from 'vue'
+import { useCtx } from '../core/useCtx'
 import QuoteBar from './QuoteBar.vue'
 import { h } from '../satori/element'
 
-const ctx = inject('ctx')
+const ctx = useCtx()
 const chat = ctx.chat
 const quickreply = ctx.quickreply
 
