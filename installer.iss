@@ -8,7 +8,7 @@
 #define MyAppId "com.yunhu.yunhulaoda"
 
 [Setup]
-AppId={{#MyAppId}
+AppId={#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
