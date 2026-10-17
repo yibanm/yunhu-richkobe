@@ -1,97 +1,134 @@
-# 云湖牢大版（Flutter 重写版）
+# 云湖牢大版
 
-> 云湖第三方客户端 · **牢大版** · Flutter 单代码库双端（Windows 桌面 / Android）
-> QQ 式三栏布局 · Material 3 · 调色盘（主题色 / 聊天底图自定义）
+> 云湖第三方客户端 · **牢大版** · Vue3 + 真 cordis 插件内核 + Koishi 式控制台 + Satori 消息层
+> 三端同源：Web · Windows 桌面（Electron）· Android（Capacitor）
+> **QQ 式布局**：顶部标题栏（品牌 + 头像/昵称/签名）+ 左竖条功能栏 + ≡ 菜单 + 三栏聊天区
 
 > 仅供 **学习交流**。接口来自社区公开整理：
-> [yh-Tpdev/yhchatAPI](https://github.com/yh-Tpdev/yhchatAPI)（在线 <https://yh-api.yyyyt.top>）。
-> 只使用 **你自己的账号 token**。
+> [yh-Tpdev/yhchatAPI](https://github.com/yh-Tpdev/yhchatAPI)（在线 <https://yh-api.yyyyt.top>）与
+> [yhwiki](https://codeberg.org/ybr/yhwiki)。只使用 **你自己的账号 token**。
+
+> 🔱 **Fork 来源**：本仓库 fork 自上游 [FLY1919](https://github.com/FLY1919)/[yunhu-vue](https://github.com/FLY1919/yunhu-vue)。
+> 上游的接口实现（94 个 /v1/ 接口）、cordis 插件内核、Satori 消息层、控制台框架**原样沿用**；
+> 本项目在其上重建 Windows/Android 壳、按 QQ 重排 UI、整顿工程质量。
+
+**全量 TypeScript，`vue-tsc --noEmit` 0 error。**
+
+> 📘 想写插件？看 [`docs/plugin-development.md`](docs/plugin-development.md) —— 从最小插件到「撤回消息」完整案例。
 
 ---
 
-## 一、与上游的关系（独立性与鸣谢）
+## 一、平台与获取
 
-本项目**功能与协议设计参考**自 [FLY1919/yunhu-vue](https://github.com/FLY1919/yunhu-vue)，
-但为 **clean-room 独立重写**：未复制其任何源码，技术栈完全不同（Flutter/Dart vs Vue/TS/Electron/Capacitor）。
-旧版（Vue/Electron/Capacitor 实现）整体保留在 [`legacy/`](legacy/) 目录，仅作功能参考与鸣谢凭据，不参与构建。
+| 平台 | 形态 | 产物 |
+|---|---|---|
+| Windows x64 | Electron 桌面应用 | `yunhulaoda-<版本>-windows-x64-setup.exe`（NSIS 安装版）/ `yunhulaoda-<版本>-windows-x64.zip`（便携版） |
+| Android arm64 | Capacitor 壳 + WebView | `yunhulaoda-<版本>-android-arm64.apk` |
+| Web | 纯浏览器 / 自托管 | `npm run build && npm run serve` |
 
-> ⚖️ **许可说明**：上游 yunhu-vue **未附带开源许可证**，README 声明「仅供学习交流」。
-> 因此本项目不复制其代码、不就上游代码主张权利；云湖接口为第三方私有服务，
-> 使用须遵守云湖用户协议。**请勿将本客户端用于商业用途或违反服务条款的场景。**
+安装包与 APK 见 [Releases](../../releases)。桌面版内置 Node 反代服务端，双击即用；
+Android 版打开后在「设置 → API 基址」确认链路即可使用。
 
-## 二、获取
-
-| 平台 | 产物 |
-|---|---|
-| Windows x64 | `yunhulaoda-<版本>-windows-x64.zip`（便携版，解压即用） |
-| Android arm64 | `yunhulaoda-<版本>-android-arm64.apk` |
-
-见 [Releases](../../releases)。GitHub 在本页自动附带 Source code (zip/tar.gz)。
-
-## 三、界面（QQ 式）
+## 二、界面（QQ 式）
 
 ```
-┌──┬──────────┬──────────────────────────────┐
-│头│ 搜索     │  会话标题              ID    │
-│像├──────────┼──────────────────────────────┤
-│消│ 会话 1   │                              │
-│息│ 会话 2 ● │        消息流（可铺底图）      │
-│通│ 会话 3   │                              │
-│录├────────────────────────────────────────┤
-│设│          │  [输入消息，Enter 发送] [发送] │
-│置│          │                              │
-││          │                              │
-│ⓘ│          │                              │
-└──┴──────────┴──────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│ [logo] 云湖牢大版   [头像] 昵称  编辑个性签名    │  ← 顶栏
+├──┬───────────┬───────────────────────────────┤
+│头│ 搜索   +  │ 会话名 ●在线        📞 📹 ⋯    │
+│像│───────────│───────────────────────────────│
+│💬│ 会话 1 99+│      消息流（气泡/引用/撤回）     │
+│👥│ 会话 2    │                               │
+│⭐│ 会话 3    │                               │
+│├───────────┼───────────────────────────────┤
+│≡│           │ 😊 ✂ 📁  🎤   [输入] [发送]   │
+└──┴───────────┴───────────────────────────────┘
 ```
 
-- **左功能栏**：头像 / 消息 / 通讯录 / 设置 / **调色盘** / **关于**（对应 QQ 竖条层级）
-- **中栏**：会话列表（搜索、未读角标、@提醒加粗）
-- **右栏**：聊天主区（标题栏 / 消息流 / 输入区）
-- **调色盘**：8 套预设主题色 + HSL 自定义取色 + 自定义聊天底图（URL）+ 清除
-- **关于页**：本项目作者信息 + 对上游作者 FLY1919 的鸣谢 + 许可声明
+- **顶栏**：品牌 logo + 名称；头像 + 昵称 + 个性签名（点击进账号页）
+- **左竖条**：头像 + 功能图标（消息/通讯录/收藏…由插件注册页动态生成）；
+  底部 **调色盘**（主题色/底图）、主题切换、**≡ 菜单**（收藏/文件/聊天记录管理/检查更新/帮助/设置/退出账号）
+- **中栏**：会话列表（搜索、未读角标、@提醒、时间）
+- **右栏**：聊天主区（标题栏状态点 + 工具按钮 / 消息流 / 输入区工具条）
 
-## 四、身份独立（与旧版/他应用零冲突）
+## 三、三层结构（沿用上游内核）
 
-- Windows：exe 名 `yunhulaoda.exe`（ASCII）、窗口类 `YunhuLaoda_MainWindow`、
-  AppUserModelID `com.yunhu.yunhulaoda` —— 任务栏分组、快捷方式解析与旧版 Electron 客户端完全隔离
-- Android：包名 `com.yunhu.kobe`、应用名 `yhchat kobe`、品牌自适应图标
-- 数据目录独立（Flutter 应用沙箱），不与任何 `yunhu-vue` 系应用共享
+```
+┌───────────────────────────────────────────────┐
+│ 控制台 (Koishi 风格)                           │
+│   rail 导航由「插件注册的页面」动态生成          │
+│   ctx.page / ctx.slot / ctx.action / ctx.menu  │
+├───────────────────────────────────────────────┤
+│ Satori 消息层                                  │
+│   Element[] 元素树 · Session · Bot             │
+│   适配器负责 云湖 protobuf ⇄ 元素树             │
+├───────────────────────────────────────────────┤
+│ Cordis 内核                                    │
+│   Context / plugin / Service / inject / effect │
+└───────────────────────────────────────────────┘
+```
 
-## 五、构建
+内核机制、Satori 元素树、控制台注册 API 与上游一致，见
+[`docs/plugin-development.md`](docs/plugin-development.md) 与 [`docs/cordis-notes.md`](docs/cordis-notes.md)。
 
-本地环境：Flutter 3.35+（stable）。
+## 四、功能（沿用上游已实现接口）
+
+登录（邮箱/Token）· 会话（未读/@/搜索）· 消息收发 · **消息操作（撤回/多选/全选/转发/引用 + 右键菜单）** ·
+**群管理（成员/踢出/禁言/看板/记录搜索）** · **A2UI v0.9** · **视频/语音** · **WebSocket 实时** ·
+**资源代理**（补 Referer 解锁图片/表情/音频/视频/文件/头像）· **富消息渲染**（统一走元素树）·
+浅色深色 · 移动端抽屉 · **桌面托盘/单实例** · **启动失败可视错误页** ·
+接口覆盖见 [`docs/api-coverage.md`](docs/api-coverage.md)（已实现 94 / 文档 234）。
+
+## 五、运行与构建
 
 ```bash
-flutter pub get
-flutter run -d windows            # Windows 开发态（需 VS「使用 C++ 的桌面开发」工作负载）
-flutter build windows --release   # Windows 产物：build/windows/x64/runner/Release/
-flutter build apk --release --split-per-abi --target-platform android-arm64
+npm install
+npm run dev                      # Web 开发
+npm run build && npm run serve   # Web 生产：HOST=:: PORT=8902 node server.ts
+npm run typecheck                # vue-tsc
+npm run test:kernel              # 内核语义测试（无需账号）
 ```
 
-> Windows 本地编译需要 Visual Studio「Desktop development with C++」工作负载
-> （含 C++ CMake 工具与 Windows SDK）；无管理员权限的机器建议直接用云端 CI 产物。
+桌面版（Windows）：
 
-云端构建（可复现）：推送 `v*` tag 触发 `.github/workflows/build-release.yml`，
-Windows / Android 双 job 构建后自动发布 Release 并按规范重命名产物。
+```bash
+npm run desktop                  # 开发态跑 Electron 壳
+npm run desktop:pack             # 产出 release/yunhulaoda-<版本>-windows-x64-setup.exe / .zip
+```
+
+Android 版：
+
+```bash
+npm run android:sync             # 构建 Web + 同步到 android 工程
+npm run android:apk              # 产出 android/app/build/outputs/apk/release/app-release.apk
+```
+
+> 本地构建环境：Node ≥ 22；Android 需 JDK 21（Capacitor 8）+ Android SDK（compileSdk 36）。
+> 云端构建（GitHub Actions）与本地一致：推送 `v*` tag 触发 `.github/workflows/build-release.yml`。
 
 ## 六、目录
 
 ```
-├── lib/
-│   ├── main.dart              # 入口 + 主题（M3 + 自定义强调色/底图）
-│   ├── core/pb.dart           # protobuf wire 编解码（clean-room，跳过废弃 group 字段）
-│   ├── core/api.dart          # 云湖 v1 接口封装（token 头 / protobuf 体 / 20s 超时）
-│   ├── core/ws.dart           # 实时通道（JSON 帧：login / heartbeat / push_*）
-│   ├── state/app_state.dart   # 全局状态（登录态 / 会话 / 消息 / 主题持久化）
-│   └── ui/                    # 登录 / QQ 式主页 / 聊天区 / 调色盘 / 关于
-├── windows/ android/          # Flutter 平台壳（独立身份配置）
-├── assets/brand.jpg           # 品牌图
-├── legacy/                    # 旧版 Vue/Electron/Capacitor 实现（仅参考，不构建）
-└── test/widget_test.dart      # wire 编解码往返 + 废弃字段跳过 单测
+├── server.ts                 # 托管 + /api + /res + /config（Node 24 直接跑 TS）
+├── electron/                 # Windows 桌面壳
+├── electron-builder.yml      # NSIS 安装版 + 便携 zip
+├── capacitor.config.ts       # Android 壳（appId=com.yunhu.kobe）
+├── android/                  # Capacitor Android 工程（入库可复现）
+├── build/ assets/            # 品牌图标源 / README 插图 / 应用内 logo
+├── scripts/gen_icons.py      # 从一张方图生成全平台图标
+├── src/
+│   ├── core/context.ts       # ★ Cordis 内核（沿用上游）
+│   ├── satori/               # ★ Satori 消息层（沿用上游）
+│   ├── console/              # ★ 控制台（QQ 式外壳 + 插件页）
+│   ├── plugins/              # 21 个插件（沿用上游 + 整顿）
+│   └── components/           # 聊天 UI
+├── flutter-prototype/        # Flutter 重写原型（存档参考，不参与构建）
+└── docs/                     # 插件开发 / cordis 笔记 / 接口覆盖
 ```
 
 ## 七、鸣谢
 
-- **FLY1919**（[yunhu-vue](https://github.com/FLY1919/yunhu-vue)）：功能蓝图与云湖接口行为的公开整理
+- **FLY1919**（[yunhu-vue](https://github.com/FLY1919/yunhu-vue)）：内核、接口实现与整体架构
 - 云湖接口文档社区：[yh-Tpdev/yhchatAPI](https://github.com/yh-Tpdev/yhchatAPI)
+
+> ⚖️ 上游未附带开源许可证、声明「仅供学习交流」；本项目同样仅供学习交流，请勿商用。

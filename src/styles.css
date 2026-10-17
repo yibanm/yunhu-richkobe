@@ -150,10 +150,31 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .console {
   display: grid;
   grid-template-columns: 60px 1fr;
-  grid-template-rows: 1fr 28px;
-  grid-template-areas: 'rail page' 'status status';
+  grid-template-rows: 44px 1fr 28px;
+  grid-template-areas:
+    'title title'
+    'rail page'
+    'status status';
   height: 100%;
 }
+/* ===== 顶栏（QQ 同款） ===== */
+.titlebar {
+  grid-area: title; display: flex; align-items: center; gap: 14px;
+  padding: 0 14px; background: var(--rail); border-bottom: 1px solid var(--line);
+}
+.tb-brand { display: flex; align-items: center; gap: 8px; }
+.tb-logo { width: 24px; height: 24px; border-radius: 6px; }
+.tb-name { font-weight: 600; font-size: 13.5px; }
+.tb-user {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 10px; border-radius: 8px;
+  transition: background var(--motion-fast);
+}
+.tb-user:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.tb-avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--card2); }
+.tb-nick { font-weight: 600; font-size: 13px; }
+.tb-sign { font-size: 12px; color: var(--fg2); }
+.tb-spacer { flex: 1; }
 .rail {
   grid-area: rail; background: var(--rail); border-right: 1px solid var(--line);
   display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 6px;
@@ -168,6 +189,21 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 /* QQ 式分组分隔线：消息区 / 工具区 / 系统区 之间的层级断点 */
 .rail-sep { width: 24px; height: 1px; background: var(--line2); margin: 6px 0; flex: 0 0 1px; }
 .rail-foot { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+/* ===== ≡ 菜单（QQ 左下角同款） ===== */
+.menu-wrap { position: relative; }
+.rail-menu {
+  position: absolute; left: 52px; bottom: -6px; z-index: 90; min-width: 168px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--elev-3); padding: 5px;
+}
+.rm-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  background: transparent; color: var(--fg); font-weight: 400; font-size: 13px;
+  padding: 8px 10px; border-radius: 7px;
+}
+.rm-item:hover { background: var(--card2); }
+.rm-item.danger { color: var(--err); }
+.rm-sep { height: 1px; background: var(--line); margin: 5px 4px; }
 .rail-btn {
   width: 40px; height: 40px; border-radius: var(--radius-sm); background: transparent; color: var(--fg2);
   display: grid; place-items: center; position: relative; padding: 0;
