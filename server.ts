@@ -30,9 +30,9 @@ const ROOT: string = existsSync(join(__dirname, 'dist')) ? join(__dirname, 'dist
 const DATA_DIR: string = process.env.YH_DATA_DIR || __dirname
 const CONFIG_FILE: string = join(DATA_DIR, 'yunhu.config.yml')
 
-const DEFAULT_CONFIG = `# 云湖第三方客户端配置
+const DEFAULT_CONFIG = `# 云湖牢大版配置
 app:
-  title: 云湖 · 第三方客户端
+  title: 云湖牢大版
   theme: dark
   pollMs: 4000
 plugins:

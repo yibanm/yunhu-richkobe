@@ -18,7 +18,7 @@ export interface AppConfig {
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  app: { theme: 'dark', title: '云湖 · 第三方客户端', pollMs: 4000 },
+  app: { theme: 'dark', title: '云湖牢大版', pollMs: 4000 },
   plugins: {},
 }
 
