@@ -86,6 +86,7 @@ watch(() => cur.value?.id, toBottom)
     </button>
     <div class="head-main">
       <div class="t">
+        <span class="dot" v-if="cur" :class="ctx.ws?.state.status === 'online' ? 'on' : 'wait'"></span>
         <span class="nm">{{ cur?.name || '未选择会话' }}</span>
         <span class="s" v-if="cur">{{ CHAT_TYPE_LABEL[cur.type] }} · {{ cur.id }}</span>
       </div>
