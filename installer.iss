@@ -26,8 +26,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
-[Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; 语言：windows runner 自带的 Inno Setup 不含非官方中文语言包，
+; 故安装向导用默认语言；应用本体界面为中文。
+; [Languages] 段刻意省略
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务:"
