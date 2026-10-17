@@ -24,3 +24,9 @@ local.properties
 certs/
 *.pem
 dist-server/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
