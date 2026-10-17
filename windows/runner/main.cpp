@@ -1,6 +1,8 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
+// SetCurrentProcessExplicitAppUserModelID 的声明所在
+#include <Shobjidl.h>
 
 #include "flutter_window.h"
 #include "utils.h"
