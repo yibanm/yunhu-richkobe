@@ -106,9 +106,19 @@ class YunhuApi {
   }
 
   void assertOk(YunhuResp r) {
-    final code = r.json?['code'] ?? (r.pb != null ? Pb.num(r.pb!, 1) : null);
-    if (r.status != 200 || (code != null && code != 0 && code != 200)) {
-      throw ApiException(r.json?['msg']?.toString() ?? '请求失败(${r.status})');
+    if (r.json != null) {
+      // JSON 信封：成功码为 1（云湖约定），msg 为失败原因
+      final code = r.json!['code'];
+      if (code != 1) {
+        throw ApiException(r.json!['msg']?.toString() ?? '请求失败($code)');
+      }
+      return;
+    }
+    // protobuf 信封：Status 在字段 1，其 code 在字段 2（1=成功），msg 在字段 3
+    final st = Pb.msg(r.pb!, 1);
+    final code = Pb.num(st, 2);
+    if (code != 0 && code != 1) {
+      throw ApiException(Pb.str(st, 3).isEmpty ? '请求失败($code)' : Pb.str(st, 3));
     }
   }
 

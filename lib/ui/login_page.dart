@@ -13,8 +13,10 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _pass = TextEditingController();
+  final _token = TextEditingController();
   bool _busy = false;
   String _err = '';
+  bool _tokenTab = false;
 
   Future<void> _submit() async {
     setState(() {
@@ -22,7 +24,11 @@ class _LoginPageState extends State<LoginPage> {
       _err = '';
     });
     try {
-      await widget.state.login(_email.text.trim(), _pass.text);
+      if (_tokenTab) {
+        await widget.state.loginByToken(_token.text);
+      } else {
+        await widget.state.login(_email.text.trim(), _pass.text);
+      }
     } catch (e) {
       if (mounted) setState(() => _err = e.toString());
     } finally {
@@ -53,17 +59,37 @@ class _LoginPageState extends State<LoginPage> {
                   Text('Flutter 重写 · 仅供学习交流',
                       style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
                   const SizedBox(height: 20),
-                  TextField(
-                    controller: _email,
-                    decoration: const InputDecoration(labelText: '邮箱', border: OutlineInputBorder()),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('邮箱登录')),
+                      ButtonSegment(value: true, label: Text('Token 登录')),
+                    ],
+                    selected: {_tokenTab},
+                    onSelectionChanged: (s) => setState(() => _tokenTab = s.first),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _pass,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: '密码', border: OutlineInputBorder()),
-                    onSubmitted: (_) => _submit(),
-                  ),
+                  const SizedBox(height: 14),
+                  if (!_tokenTab) ...[
+                    TextField(
+                      controller: _email,
+                      decoration: const InputDecoration(labelText: '邮箱', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _pass,
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: '密码', border: OutlineInputBorder()),
+                      onSubmitted: (_) => _submit(),
+                    ),
+                  ] else
+                    TextField(
+                      controller: _token,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                          labelText: '账号 Token',
+                          hintText: '粘贴你的云湖 token',
+                          border: OutlineInputBorder()),
+                      onSubmitted: (_) => _submit(),
+                    ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,

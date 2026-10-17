@@ -43,6 +43,23 @@ class AppState extends ChangeNotifier {
 
   Future<void> login(String email, String password) async {
     final t = await api.login(email, password, _deviceId);
+    await _adoptToken(t);
+  }
+
+  /// Token 登录：直接存 token 并验证有效性（旧版同款行为）
+  Future<void> loginByToken(String token) async {
+    if (token.trim().isEmpty) throw ApiException('请输入 token');
+    api.token = token.trim();
+    try {
+      await api.self();
+    } catch (e) {
+      api.token = '';
+      rethrow;
+    }
+    await _adoptToken(token.trim());
+  }
+
+  Future<void> _adoptToken(String t) async {
     token = t;
     api.token = t;
     final sp = await SharedPreferences.getInstance();
