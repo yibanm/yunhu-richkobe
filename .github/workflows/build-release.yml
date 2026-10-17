@@ -14,7 +14,8 @@ concurrency:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    # 固定 windows-2022（VS 2022）：Flutter 3.35 的 VS 探测不识别 windows-2025 镜像的 VS 2026
+    runs-on: windows-2022
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
