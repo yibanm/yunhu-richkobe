@@ -24,6 +24,13 @@ const current = computed({
 })
 const pages = computed(() => console_.pages || [])
 
+/** 主导航只留「消息 / 通讯录」两项（QQ 语义），其余全部进左下 ☰ 菜单 */
+const MAIN_PATHS = ['/', '/contacts']
+/** 固定菜单项已覆盖的页面路径，动态列表里去重，避免同页两项 */
+const COVERED_PATHS = ['/stickers', '/theme', '/logs', '/settings-user', '/plugins']
+const railPages = computed(() => pages.value.filter((p: any) => MAIN_PATHS.includes(p.path)))
+const morePages = computed(() => pages.value.filter((p: any) => !MAIN_PATHS.includes(p.path) && !COVERED_PATHS.includes(p.path)))
+
 /**
  * 当前页对象。
  * ⚠️ current 存的是**路径字符串**，pages 里是**页面对象** —— 必须按 path 找。
@@ -76,7 +83,7 @@ function pick(what: string) {
            alt="我的资料" title="我的资料" @click="openMe"
            @error="(e: any) => (e.target.src = fallbackAvatar(auth?.state.user?.name))" />
       <div class="rail-items">
-        <button v-for="p in pages" :key="p.path"
+        <button v-for="p in railPages" :key="p.path"
                 class="rail-btn" :class="{ on: active === p }"
                 :title="p.name" @click="current = p.path">
           <Icon :name="p.icon" />
@@ -101,7 +108,13 @@ function pick(what: string) {
             <button class="rm-item" :disabled="!has('/plugins')" @click="pick('help')"><Icon name="help" :size="15" /> 帮助</button>
             <button class="rm-item" disabled><Icon name="lock" :size="15" /> 锁定</button>
             <div class="rm-sep"></div>
-            <button class="rm-item" :disabled="!has('/settings-user')" @click="pick('settings')"><Icon name="settings" :size="15" /> 设置</button>
+            <button class="rm-item" :disabled="!has('/settings-user')" @click="pick('settings')"><Icon name="settings" :size="15" /> 用户设置</button>
+            <div class="rm-sep"></div>
+            <!-- 其余插件注册页（动态） -->
+            <button v-for="p in morePages" :key="p.path" class="rm-item" @click="go(p.path)">
+              <Icon :name="p.icon" :size="15" /> {{ p.name }}
+            </button>
+            <div class="rm-sep"></div>
             <button class="rm-item danger" @click="pick('logout')"><Icon name="logout" :size="15" /> 退出账号</button>
           </div>
         </div>

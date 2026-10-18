@@ -514,3 +514,19 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 /* 聊天标题栏 QQ 式图标按钮 */
 .icon-btn { width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center; }
 .ctx-menu .rm-item.on { background: var(--acc-soft); color: var(--acc); }
+
+/* ===================================================================
+   QQ 式细节打磨
+   =================================================================== */
+/* 会话列表与消息流头像：QQ 式圆角矩形（非正圆） */
+.convs img, .me img, .row img.av { border-radius: 8px; }
+/* 未读气泡：QQ 红 */
+.badge { background: #f04b3e; }
+/* 消息流时间分隔胶囊 */
+.time-div { align-self: center; margin: 4px 0; }
+.time-div span {
+  font-size: 11px; color: var(--fg2); background: color-mix(in srgb, var(--card) 70%, transparent);
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px;
+}
+/* 待发送区拖入提示 */
+.composer.drag-over { outline: 2px dashed var(--acc); outline-offset: -4px; }

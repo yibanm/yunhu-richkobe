@@ -289,10 +289,29 @@ export const chatPlugin = {
       try {
         const list = await api.conversations()
         list.sort((a: any, b: any) => b.ts - a.ts)
+        // 正在查看的会话：服务端未读数是陈旧的（只在 dismiss 时清），
+        // 直接覆盖会让当前会话重新冒出未读气泡 —— 本地先归零。
+        if (state.current) {
+          const cur = list.find((c: any) => c.id === state.current!.id)
+          if (cur) { cur.unread = 0; cur.at = false }
+        }
         state.conversations = list
       } catch (e: any) {
-        if (!silent) ctx.emit('ui/toast', { text: '会话列表加载失败：' + e.message, type: 'error' })
+        if (!silent) ctx.emit('ui/toast', { text: '会话列表加载失败：' + e.message, 'type': 'error' })
       } finally { state.loadingConvs = false }
+    }
+
+    /** 当前会话收到新消息时防抖向服务器报已读，否则下一轮轮询会把气泡带回来 */
+    let dismissTimer: any = null
+    let dismissId: string | null = null
+    function scheduleDismiss(id: string) {
+      dismissId = id
+      if (dismissTimer) clearTimeout(dismissTimer)
+      dismissTimer = setTimeout(() => {
+        dismissTimer = null
+        if (dismissId && state.current?.id === dismissId) api.dismiss(dismissId).catch(() => {})
+        dismissId = null
+      }, 2500)
     }
 
     async function loadMessages(silent = false) {
@@ -524,6 +543,7 @@ export const chatPlugin = {
         conv.preview = previewOf(m)
         conv.ts = session.timestamp
         if (!isCurrent && kind === 'created') conv.unread = (conv.unread || 0) + 1
+        if (isCurrent && kind === 'created' && !mine) scheduleDismiss(session.channel.id)
         const idx = state.conversations.indexOf(conv)
         if (idx > 0) { state.conversations.splice(idx, 1); state.conversations.unshift(conv) }
       } else if (kind === 'created') {

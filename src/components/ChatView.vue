@@ -25,6 +25,18 @@ const emit = defineEmits<{ (e: 'toggle-sidebar'): void }>()
 
 const cur = computed(() => chat.state.current)
 
+/** 消息流：相邻消息间隔 > 5 分钟时插入时间分隔胶囊（QQ 式） */
+const flow = computed(() => {
+  const out: Array<{ t: 'div'; ts: number; id: string } | { t: 'msg'; msg: any }> = []
+  let last = 0
+  for (const m of chat.state.messages || []) {
+    if (m.ts && (!last || m.ts - last > 5 * 60 * 1000)) out.push({ t: 'div', ts: m.ts, id: 'div-' + m.id })
+    out.push({ t: 'msg', msg: m })
+    if (m.ts) last = m.ts
+  }
+  return out
+})
+
 /* ---- 右键菜单状态 ---- */
 /** 右上角「⋮」菜单 */
 const moreOpen = ref(false)
@@ -72,6 +84,19 @@ function jumpTo(mid: string) {
 }
 
 function toBottom() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
+
+/** 时间分隔胶囊文案：今天/昨天/日期 + 时分 */
+function fmtDiv(ts: number) {
+  const d = new Date(ts)
+  const now = new Date()
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const sameDay = d.toDateString() === now.toDateString()
+  const yest = new Date(now.getTime() - 86400000)
+  if (sameDay) return hm
+  if (d.toDateString() === yest.toDateString()) return `昨天 ${hm}`
+  if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}月${d.getDate()}日 ${hm}`
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${hm}`
+}
 const off = ctx.on('chat/scroll-bottom', toBottom)
 onUnmounted(() => off())
 // 点空白关掉 ⋮ 菜单
@@ -147,7 +172,10 @@ watch(() => cur.value?.id, toBottom)
         {{ chat.state.loadingMore ? '加载中…' : '加载更多历史' }}
       </button>
     </div>
-    <MessageItem v-for="m in chat.state.messages" :key="m.id" :msg="m" @menu="openMenu" @quote-jump="jumpTo" />
+    <template v-for="f in flow" :key="f.t === 'div' ? f.id : f.msg.id">
+      <div v-if="f.t === 'div'" class="sys time-div"><span>{{ fmtDiv(f.ts) }}</span></div>
+      <MessageItem v-else :msg="f.msg" @menu="openMenu" @quote-jump="jumpTo" />
+    </template>
     <div v-if="chat.state.loadingMsgs" class="sys">加载中…</div>
   </div>
 
