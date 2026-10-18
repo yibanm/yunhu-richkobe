@@ -31,6 +31,10 @@ const COVERED_PATHS = ['/stickers', '/theme', '/logs', '/settings-user', '/plugi
 const railPages = computed(() => pages.value.filter((p: any) => MAIN_PATHS.includes(p.path)))
 const morePages = computed(() => pages.value.filter((p: any) => !MAIN_PATHS.includes(p.path) && !COVERED_PATHS.includes(p.path)))
 
+/** 总未读（QQ 式角标，挂在「消息」导航上） */
+const totalUnread = computed(() =>
+  (ctx.chat?.state?.conversations || []).reduce((n: number, c: any) => n + (c.unread || 0), 0))
+
 /**
  * 当前页对象。
  * ⚠️ current 存的是**路径字符串**，pages 里是**页面对象** —— 必须按 path 找。
@@ -87,6 +91,7 @@ function pick(what: string) {
                 class="rail-btn" :class="{ on: active === p }"
                 :title="p.name" @click="current = p.path">
           <Icon :name="p.icon" />
+          <span v-if="p.path === '/' && totalUnread" class="badge rail-badge">{{ totalUnread > 99 ? '99+' : totalUnread }}</span>
         </button>
       </div>
       <div class="rail-foot">

@@ -24,6 +24,12 @@ const videoInput = ref<HTMLInputElement | null>(null)
 const barItems = computed(() => (chat.composerOf?.('composer') || []).filter((it: any) => it.kind !== 'quick'))
 const qrItems = computed(() => (chat.composerOf?.('composer') || []).filter((it: any) => it.kind === 'quick'))
 
+/** QQ 式图标工具条：非模式切换的按钮渲染成图标（title 保留文字语义） */
+const BAR_ICON: Record<string, string> = {
+  emoji: 'smile', image: 'image', file: 'paperclip', voice: 'mic',
+  audioFile: 'mic', videoFile: 'video', videoRec: 'record',
+}
+
 function onInput() {
   autoresize()
   if (!text.value.startsWith('/')) return
@@ -184,9 +190,13 @@ function fmtSize(n: number) {
        @drop="onDrop" @dragover.prevent="dragOver = true" @dragleave="dragOver = false">
     <QuoteBar />
     <div class="bar-row">
-      <button v-for="it in barItems" :key="it.id" class="ghost tiny"
-              :class="{ on: it.kind === 'type' && kind === it.value }"
-              @click="onBar(it)">{{ it.label }}</button>
+      <template v-for="it in barItems" :key="it.id">
+        <button v-if="it.kind === 'type'" class="ghost tiny"
+                :class="{ on: kind === it.value }" @click="onBar(it)">{{ it.label }}</button>
+        <button v-else class="ghost tiny icon-btn" :title="it.label" @click="onBar(it)">
+          <Icon :name="BAR_ICON[it.kind] || 'page'" :size="16" />
+        </button>
+      </template>
       <input ref="imgInput" type="file" accept="image/*" hidden @change="onPick" />
       <input ref="fileInput" type="file" hidden @change="onPick" />
       <input ref="audioInput" type="file" accept="audio/*" hidden @change="(e: any) => ctx.stickers?.sendAudioFile?.(e)" />

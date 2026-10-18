@@ -530,3 +530,6 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 }
 /* 待发送区拖入提示 */
 .composer.drag-over { outline: 2px dashed var(--acc); outline-offset: -4px; }
+/* 导航角标（QQ 式总未读） */
+.rail-btn { position: relative; }
+.rail-badge { position: absolute; top: 2px; right: 2px; }
