@@ -89,7 +89,7 @@ export const wsPlugin = {
         log('已连接，发送登录包')
         sendJson({
           seq: seq(), cmd: 'login',
-          data: { userId: auth.state.user?.id, token: api.token, platform: 'Web', deviceId: deviceId() },
+          data: { userId: auth.state.user?.id, token: api.token, platform: 'Web', deviceId: auth.deviceId || deviceId() },
         })
         clearInterval(hbTimer)
         hbTimer = setInterval(() => sendJson({ seq: seq(), cmd: 'heartbeat', data: {} }), hbMs)

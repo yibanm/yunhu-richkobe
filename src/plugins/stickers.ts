@@ -271,12 +271,12 @@ export const stickersPlugin = {
     }
     ctx.set('stickers', service)
 
-    /* ---------------- 输入区按钮 ---------------- */
+    /* ---------------- 输入区按钮 ----------------
+     * 默认序（用户定）：文本/MD/HTML(10-12) → 表情(40) → 图片(50) → 视频(60) → 文件(70)。
+     * 录音/录制视频按钮按用户要求移除（service 函数保留给其他插件/快捷键用）。 */
     ctx.effect(() => chat.composer('composer', [
       { id: 'emoji.panel', kind: 'emoji', label: '表情', order: 40 },
-      { id: 'voice.rec', kind: 'voice', label: '语音', order: 41 },
-      { id: 'video.pick', kind: 'videoFile', label: '视频', order: 42 },
-      { id: 'video.rec', kind: 'videoRec', label: '录制视频', order: 43 },
+      { id: 'video.pick', kind: 'videoFile', label: '视频', order: 60 },
     ], ctx))
 
     /* ---------------- 全局浮层 ---------------- */

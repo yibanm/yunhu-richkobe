@@ -11,6 +11,7 @@ import { reactive } from 'vue'
 import type { Context } from '../core/context'
 import ForwardDialog from '../components/ForwardDialog.vue'
 import EditHistoryDialog from '../components/EditHistoryDialog.vue'
+import EditDialog from '../components/EditDialog.vue'
 import SelectAllButton from '../components/SelectAllButton.vue'
 
 export const messageActionsPlugin = {
@@ -97,6 +98,11 @@ export const messageActionsPlugin = {
     /* ---------------- 动作 ---------------- */
     chat.action('msg.reply', { action: ({ msg }: any) => chat.setReply(msg) }, ctx)
 
+    /** 编辑自己的文本消息：打开编辑对话框（QQ 式轻量交互，无弹窗确认） */
+    chat.action('msg.edit', {
+      action: ({ msg }: any) => { state.editingId = msg.id },
+    }, ctx)
+
     chat.action('msg.forward', { action: ({ msg }: any) => service.openForward([msg.id]) }, ctx)
 
     chat.action('msg.copy', {
@@ -132,10 +138,11 @@ export const messageActionsPlugin = {
 
     chat.action('msg.recall', {
       action: async ({ msg }: any) => {
-        const mine = msg.right ? '这条消息' : `「${msg.sender}」的消息`
-        if (!window.confirm(`确定撤回${mine}？`)) return
-        try { await chat.recall([msg.id]) }
-        catch (e: any) { ui.toast('撤回失败（可能没有管理员权限）：' + e.message, 'error') }
+        // QQ 式：撤回不做生硬的 confirm 弹窗，直接执行 + 轻量 toast；失败才提示原因
+        try {
+          await chat.recall([msg.id])
+          ui.toast(msg.right ? '已撤回' : `已撤回「${msg.sender}」的消息`, 'success')
+        } catch (e: any) { ui.toast('撤回失败（可能没有管理员权限）：' + e.message, 'error') }
       },
     }, ctx)
 
@@ -186,6 +193,7 @@ export const messageActionsPlugin = {
       ctx.console.addEntry((cc: any) => {
         cc.slot({ type: 'global', component: ForwardDialog, order: 50 })
         cc.slot({ type: 'global', component: EditHistoryDialog, order: 51 })
+        cc.slot({ type: 'global', component: EditDialog, order: 52 })
       })
     })
   },

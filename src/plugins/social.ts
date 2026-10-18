@@ -76,11 +76,17 @@ export const socialPlugin = {
 
     async function createGroup(name: string, introduction = '') {
       try {
-        const id: string = await api.createGroup(name, introduction)
+        // 云湖创建群聊强制要头像（avatar_url 空会回「头像不合规」）——默认用发起人自己的头像
+        const avatar = ctx.get('auth')?.state?.user?.avatar || ''
+        const id: string = await api.createGroup(name, introduction, avatar)
         ui.toast(id ? `群聊已创建（ID ${id}）` : '群聊已创建', 'success')
         ctx.emit('chat/refresh' as any)
         await loadBook()
-      } catch (e: any) { ui.toast('创建失败：' + e.message, 'error') }
+        return id || 'ok'
+      } catch (e: any) {
+        ui.toast('创建失败：' + e.message, 'error')
+        return null
+      }
     }
 
     ctx.set('social', {

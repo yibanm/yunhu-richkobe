@@ -83,11 +83,17 @@ function ratioOf(el: Element) {
   return { aspectRatio: `${w} / ${h}` }
 }
 
-/** 点击图片看原图 */
+/** 点击图片/视频 → 页内灯箱查看（QQ 式），点空白处收起 */
+const viewer = ref<{ kind: 'image' | 'video'; url: string } | null>(null)
 function openRaw(src: string) {
   const u = resUrl(src)
-  if (u) window.open(u, '_blank', 'noopener')
+  if (u) viewer.value = { kind: 'image', url: u }
 }
+function openVideo(src: string) {
+  const u = resUrl(src)
+  if (u) viewer.value = { kind: 'video', url: u }
+}
+function closeViewer() { viewer.value = null }
 
 async function fix() { await nextTick(); postProcess(body.value) }
 onMounted(fix)
@@ -135,7 +141,7 @@ watch(() => props.elements, fix, { deep: true })
            @error="(e: any) => (e.target.style.display = 'none')" />
       <img v-else-if="el.type === 'sticker'" class="sticker" :src="resUrl(el.attrs.src)" loading="lazy" alt="[表情]" />
       <div v-else-if="el.type === 'video'" class="video-wrap">
-        <video class="media" :src="resUrl(el.attrs.src)" controls preload="metadata"></video>
+        <video class="media" :src="resUrl(el.attrs.src)" controls preload="metadata" @click="openVideo(el.attrs.src)"></video>
         <span v-if="el.attrs.time" class="vtime">{{ el.attrs.time }}s</span>
       </div>
       <audio v-else-if="el.type === 'audio'" :src="resUrl(el.attrs.src)" controls preload="metadata" />
@@ -190,6 +196,15 @@ watch(() => props.elements, fix, { deep: true })
       <pre v-else class="pre">{{ el.attrs.content || ('[未支持的元素 ' + el.type + ']') }}</pre>
     </template>
   </div>
+
+  <!-- 图片/视频灯箱：点空白处收起 -->
+  <Teleport to="body">
+    <div v-if="viewer" class="viewer-mask" @click.self="closeViewer">
+      <img v-if="viewer.kind === 'image'" :src="viewer.url" alt="" @click.self="closeViewer" />
+      <video v-else :src="viewer.url" controls autoplay @click.self="closeViewer"></video>
+      <button class="viewer-x" title="关闭" @click="closeViewer">×</button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -215,6 +230,21 @@ watch(() => props.elements, fix, { deep: true })
 .rich :deep(img) { max-width: 100%; border-radius: 8px; }
 .rich :deep(blockquote) { margin: 4px 0; padding-left: 8px; border-left: 3px solid var(--line); opacity: .85; }
 .media { max-width: min(320px, 100%); max-height: 460px; border-radius: 10px; display: block; object-fit: contain; cursor: zoom-in; background: var(--card2); }
+/* 灯箱（Teleport 到 body，scoped 样式需 :deep 或直接写全局类） */
+.viewer-mask {
+  position: fixed; inset: 0; z-index: 92; background: rgba(0, 0, 0, .82);
+  display: grid; place-items: center; cursor: zoom-out; backdrop-filter: blur(3px);
+}
+.viewer-mask img, .viewer-mask video {
+  max-width: 92vw; max-height: 90vh; border-radius: 8px; cursor: zoom-out;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+}
+.viewer-x {
+  position: absolute; top: 16px; right: 18px; width: 34px; height: 34px;
+  border-radius: 50%; border: none; background: rgba(255, 255, 255, .14); color: #fff;
+  font-size: 20px; line-height: 1; cursor: pointer;
+}
+.viewer-x:hover { background: rgba(255, 255, 255, .26); }
 .sticker { max-width: 140px; max-height: 140px; display: block; object-fit: contain; }
 .video-wrap { display: inline-flex; flex-direction: column; gap: 3px; }
 .vtime { font-size: 11px; color: var(--fg2); }

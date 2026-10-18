@@ -10,11 +10,12 @@
  */
 import http from 'node:http'
 import https from 'node:https'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile, unlink } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { existsSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { handleWebdav, handleMountJson } from './webdav.ts'
 import { handleSatori } from './satori.ts'
@@ -26,6 +27,16 @@ const HOST: string = process.env.HOST || '0.0.0.0'
 const UPSTREAM: string = process.env.UPSTREAM || 'https://chat-go.jwzhd.com'
 const ROOT: string = join(__dirname, 'dist')
 const CONFIG_FILE: string = join(__dirname, 'yunhu.config.yml')
+
+/* ============ 用户数据目录（登录态/会话缓存/锁屏 PIN/扫码中继） ============
+ * 默认落在「文档/yhchat」，可用环境变量 YH_DATA_DIR 覆盖（桌面端注入 userData 子目录）。
+ * 只允许白名单内的文件名，防止路径穿越写到任意位置。
+ */
+const DATA_DIR: string = process.env.YH_DATA_DIR || join(homedir(), 'Documents', 'yhchat')
+const DATA_ALLOW = new Set(['session', 'cache', 'pin', 'lock', 'relay'])
+const DATA_MAX_BYTES = 2 * 1024 * 1024   // 会话快照可能较大，限 2MB 足够且防滥用
+const JSON_HDR = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
+try { mkdirSync(DATA_DIR, { recursive: true }) } catch { /* 目录建不起来时 /data 请求会各自报错，不影响其他路由 */ }
 
 const DEFAULT_CONFIG = `# 云湖第三方客户端配置
 app:
@@ -170,6 +181,61 @@ async function handleConfig(req: http.IncomingMessage, res: http.ServerResponse)
   res.writeHead(405).end('method not allowed')
 }
 
+/** GET/PUT/DELETE /data/<name> —— 用户数据落盘（文档/yhchat） */
+async function handleData(req: http.IncomingMessage, res: http.ServerResponse, name: string): Promise<void> {
+  if (!DATA_ALLOW.has(name)) { res.writeHead(404, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'unknown data key' })); return }
+  const file = join(DATA_DIR, name + '.json')
+  if (req.method === 'GET') {
+    try {
+      const text = existsSync(file) ? await readFile(file, 'utf8') : ''
+      res.writeHead(200, JSON_HDR).end(text || '{}')
+    } catch (e: any) { res.writeHead(500, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }
+    return
+  }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    const body = await readBody(req)
+    if (body.length > DATA_MAX_BYTES) { res.writeHead(413, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'too large' })); return }
+    try {
+      JSON.parse(body)                       // 只收合法 JSON，坏数据不落盘
+      await writeFile(file, body, 'utf8')
+      res.writeHead(200, JSON_HDR).end(JSON.stringify({ ok: true }))
+    } catch (e: any) { res.writeHead(400, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'bad json: ' + e.message })) }
+    return
+  }
+  if (req.method === 'DELETE') {
+    try { await unlink(file) } catch { /* 不存在也视为成功（幂等） */ }
+    res.writeHead(200, JSON_HDR).end(JSON.stringify({ ok: true }))
+    return
+  }
+  res.writeHead(405, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'method not allowed' }))
+}
+
+/** GET /update-check —— 代理 GitHub Releases 最新版本（检查更新用，避免前端直连被墙/CORS） */
+async function handleUpdateCheck(res: http.ServerResponse): Promise<void> {
+  const url = process.env.UPDATE_URL || 'https://api.github.com/repos/yibanm/yunhu-richkobe/releases/latest'
+  const r = await new Promise<{ status: number; body: string }>((resolve) => {
+    const req = https.get(url, { headers: { 'user-agent': 'yunhu-client', accept: 'application/vnd.github+json' } }, up => {
+      const chunks: Buffer[] = []
+      up.on('data', c => chunks.push(c))
+      up.on('end', () => resolve({ status: up.statusCode || 502, body: Buffer.concat(chunks).toString('utf8') }))
+    })
+    req.on('error', e => resolve({ status: 502, body: JSON.stringify({ message: e.message }) }))
+    req.setTimeout(8000, () => { req.destroy(); resolve({ status: 504, body: '{"message":"timeout"}' }) })
+  })
+  if (r.status !== 200) { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: `github ${r.status}` })); return }
+  try {
+    const j = JSON.parse(r.body)
+    res.writeHead(200, JSON_HDR).end(JSON.stringify({
+      ok: true,
+      tag: j.tag_name || '',
+      name: j.name || j.tag_name || '',
+      notes: j.body || '',
+      url: j.html_url || '',
+      assets: (j.assets || []).map((a: any) => ({ name: a.name, url: a.browser_download_url, size: a.size })),
+    }))
+  } catch { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'bad github payload' })) }
+}
+
 async function staticFile(res: http.ServerResponse, pathname: string): Promise<void> {
   let rel = pathname === '/' ? '/index.html' : pathname
   rel = normalize(rel).replace(/^(\.\.[/\\])+/, '')
@@ -192,6 +258,10 @@ function serverApp(req: any, res: any) {
     return
   }
   if (pathname === '/config') { handleConfig(req, res); return }
+  // 用户数据落盘（登录态/会话缓存/PIN/锁/扫码中继）
+  const dataM = pathname.match(/^\/data\/([a-z]+)$/)
+  if (dataM) { handleData(req, res, dataM[1]); return }
+  if (pathname === '/update-check' && req.method === 'GET') { handleUpdateCheck(res).catch(e => { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
   // 标准 Satori 协议端点
   if (pathname.startsWith('/satori/')) {
     handleSatori(req, res, pathname, search).catch((e) => { try { res.writeHead(500, {'Content-Type':'application/json'}); res.end(JSON.stringify({code:500,message:e.message})) } catch {} })

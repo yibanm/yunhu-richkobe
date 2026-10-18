@@ -85,6 +85,26 @@ function jumpTo(mid: string) {
 
 function toBottom() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
 
+/** 滚动时上报「是否贴底」：新消息/轮询刷新只在贴底时自动滚，翻历史不被打断 */
+let loadingTop = false
+function onScroll() {
+  const el = box.value
+  if (!el) return
+  ctx.chat?.setAtBottom?.(el.scrollHeight - el.scrollTop - el.clientHeight < 40)
+  // 历史消息自动加载：滚到顶部即拉上一页（QQ 式，不再需要点按钮），并保持阅读位置
+  if (el.scrollTop < 40 && chat.state.hasMore && !chat.state.loadingMore && !loadingTop) {
+    loadingTop = true
+    const prevH = el.scrollHeight
+    const topBefore = el.scrollTop
+    Promise.resolve(chat.loadMore()).finally(() => {
+      nextTick(() => {
+        el.scrollTop = el.scrollHeight - prevH + topBefore
+        loadingTop = false
+      })
+    })
+  }
+}
+
 /** 时间分隔胶囊文案：今天/昨天/日期 + 时分 */
 function fmtDiv(ts: number) {
   const d = new Date(ts)
@@ -112,6 +132,8 @@ watch(() => cur.value?.id, toBottom)
     <div class="head-main">
       <div class="t">
         <span class="nm">{{ cur?.name || '未选择会话' }}</span>
+        <!-- QQ 式昵称旁绿点：云湖无对方在线接口，映射为「实时连接在线」（ws online） -->
+        <span v-if="cur && ctx.ws?.state?.status === 'online'" class="online-dot" title="实时连接在线"></span>
         <span class="s" v-if="cur">{{ CHAT_TYPE_LABEL[cur.type] }} · {{ cur.id }}</span>
       </div>
     </div>
@@ -120,12 +142,7 @@ watch(() => cur.value?.id, toBottom)
       <button class="ghost small" @click="ctx.ws.reconnect()">重连</button>
     </div>
 
-    <!-- QQ 式标题栏图标：云湖公开接口没有通话/投屏端点，先占位提示，不假装能用 -->
-    <div class="head-side" v-if="cur">
-      <button class="ghost small icon-btn" title="语音通话" @click="ctx.ui?.toast?.('云湖公开接口暂无通话端点，占位按钮', 'warn')"><Icon name="phone" :size="16" /></button>
-      <button class="ghost small icon-btn" title="视频通话" @click="ctx.ui?.toast?.('云湖公开接口暂无通话端点，占位按钮', 'warn')"><Icon name="video" :size="16" /></button>
-      <button class="ghost small icon-btn" title="屏幕共享" @click="ctx.ui?.toast?.('云湖公开接口暂无投屏端点，占位按钮', 'warn')"><Icon name="screen" :size="16" /></button>
-    </div>
+    <!-- 云湖公开接口没有通话/投屏端点 —— 按「无后端即砍」原则不放占位按钮 -->
 
     <!-- 插件插槽：其他插件可以往这里塞自己的组件 -->
     <component v-for="(sl, i) in ctx.chat?.slotsOf?.('chat-header-extra') || []" :key="'h' + i"
@@ -166,11 +183,9 @@ watch(() => cur.value?.id, toBottom)
     </div>
   </div>
 
-  <div v-else ref="box" class="messages" @click="closeMenu(); closeMore()">
-    <div v-if="chat.state.hasMore" class="load-more">
-      <button class="ghost small" :disabled="chat.state.loadingMore" @click="chat.loadMore()">
-        {{ chat.state.loadingMore ? '加载中…' : '加载更多历史' }}
-      </button>
+  <div v-else ref="box" class="messages" @click="closeMenu(); closeMore()" @scroll="onScroll">
+    <div v-if="chat.state.hasMore && chat.state.loadingMore" class="load-more">
+      <span class="sys">加载历史中…</span>
     </div>
     <template v-for="f in flow" :key="f.t === 'div' ? f.id : f.msg.id">
       <div v-if="f.t === 'div'" class="sys time-div"><span>{{ fmtDiv(f.ts) }}</span></div>
@@ -184,7 +199,7 @@ watch(() => cur.value?.id, toBottom)
   <component v-for="(sl, i) in ctx.chat?.slotsOf?.('chat-before-composer') || []" :key="'bc' + i"
              :is="sl.component" v-bind="sl.props || {}" />
 
-  <Composer v-if="cur" />
+  <Composer v-if="cur" :key="cur.id" />
 
   <component v-for="(sl, i) in ctx.chat?.slotsOf?.('global') || []" :key="'g' + i"
              :is="sl.component" v-bind="sl.props || {}" />

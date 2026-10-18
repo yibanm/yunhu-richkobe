@@ -799,11 +799,19 @@ export const apiPlugin = {
 
       /**
        * 上传文件到七牛，返回可用于发消息的 key
+       *   0) 大小门：超过官方限制直接拒绝（不浪费流量）
        *   1) 取 token
        *   2) 从 token 里解析 ak / bucket，查上传域名（失败则用默认域名）
-       *   3) 经本站 /up 代理 POST（绕开浏览器跨域）
+       *   3) 经本站 /up 代理 POST（绕开浏览器跨域），XHR 带上传进度回调
        */
-      async uploadFile(file: File, kind: 'image' | 'file' | 'audio' | 'video' | 'sticker' = 'image') {
+      async uploadFile(file: File, kind: 'image' | 'file' | 'audio' | 'video' | 'sticker' = 'image',
+        onProgress?: (loaded: number, total: number) => void) {
+        // 官方上传大小限制（超出直接提示，不发起上传）
+        const LIMITS: Record<string, number> = { image: 20 * 1024 * 1024, video: 100 * 1024 * 1024, audio: 50 * 1024 * 1024, file: 100 * 1024 * 1024, sticker: 50 * 1024 * 1024 }
+        const lim = LIMITS[kind] || 100 * 1024 * 1024
+        if (file.size > lim) {
+          throw new Error(`文件超过${Math.round(lim / 1024 / 1024)}MB 上传限制（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）`)
+        }
         const token = await api.uploadToken(kind)
         const seg = token.split(':')
         const ak = seg[0] || ''
@@ -844,8 +852,17 @@ export const apiPlugin = {
           fd.append('key', key)
           fd.append('file', file)
           // 经本站代理上传：/up/<上传域名>/ -> https://<域名>/
-          const res = await fetch(`/up/${host}/`, { method: 'POST', body: fd })
-          const text = await res.text()
+          // 用 XHR 而非 fetch：fetch 拿不到上传进度，XHR 的 upload.onprogress 可以（速度条要用）
+          const text = await new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open('POST', `/up/${host}/`)
+            if (onProgress) {
+              xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded, e.total) }
+            }
+            xhr.onload = () => resolve(xhr.responseText)
+            xhr.onerror = () => reject(new Error('上传网络错误'))
+            xhr.send(fd)
+          })
           let json: any = {}
           try { json = JSON.parse(text) } catch { /* 非 JSON */ }
           if (json.key) {
@@ -862,8 +879,9 @@ export const apiPlugin = {
       },
 
       /** 上传后返回可直接用于消息的完整地址 */
-      async uploadAndUrl(file: File, kind: 'image' | 'file' | 'audio' | 'video' | 'sticker' = 'image') {
-        const { key } = await api.uploadFile(file, kind)
+      async uploadAndUrl(file: File, kind: 'image' | 'file' | 'audio' | 'video' | 'sticker' = 'image',
+        onProgress?: (loaded: number, total: number) => void) {
+        const { key } = await api.uploadFile(file, kind, onProgress)
         let routes: any = {}
         try { routes = await api.distribution() } catch { /* 忽略 */ }
         const base = kind === 'image' ? (routes.imageUrl || 'https://chat-img.jwznb.com/')
