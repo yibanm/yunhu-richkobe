@@ -41,7 +41,6 @@ import { sessionEventPlugin } from './plugins/session-event'
 import { socialPlugin } from './plugins/social'
 import { botConsolePlugin } from './plugins/botconsole'
 import { communityPlugin } from './plugins/community'
-import { deeplinkPlugin } from './plugins/deeplink'
 import { stickersPlugin } from './plugins/stickers'
 import { commandsPlugin } from './plugins/commands'
 enableMobileDebug()  // 安卓内置调试浮层（仅 native 环境生效，最早捕获初始化错误）
@@ -79,7 +78,6 @@ export const registry: RegistryItem[] = [
   { key: 'quickreply', plugin: quickReplyPlugin, desc: '快捷回复 · 注册独立页面', provide: ['quickreply'], deps: ['ui', 'chat'] },
   { key: 'market', plugin: marketPlugin, desc: '插件市场 · 用户自己安装/卸载插件（URL 或代码）', provide: ['market'], deps: ['api', 'ui', 'chat', 'console'] },
   { key: 'commands', plugin: commandsPlugin, desc: '机器人指令 · 标题栏入口 + 输入 / 唤起（按机器人归类）', provide: ['commands'], deps: ['api', 'chat', 'ui', 'console'] },
-  { key: 'deeplink', plugin: deeplinkPlugin, desc: '云湖内链 yunhu:// 支持（加好友/文章/板块）', provide: ['deeplink'], deps: ['api', 'ui', 'chat', 'console', 'community'] },
   { key: 'stickers', plugin: stickersPlugin, desc: '表情收藏面板 + 语音消息', provide: ['stickers'], deps: ['api', 'chat', 'ui', 'console'] },
   { key: 'social', plugin: socialPlugin, desc: '通讯录 · 用户/群聊/机器人 + 添加 + 创建群聊', provide: ['social'], deps: ['api', 'ui', 'console'] },
   { key: 'botconsole', plugin: botConsolePlugin, desc: '机器人控制台 · 我创建的机器人/编辑/Token/指令', provide: ['botconsole'], deps: ['api', 'ui', 'console'] },
