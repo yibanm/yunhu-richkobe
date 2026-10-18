@@ -1,7 +1,11 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { ctx, bootstrap } from './app'
+import { platform, applyPlatformAttr, enableRipple } from './platform'
 import './styles.css'
+
+applyPlatformAttr(platform)
+enableRipple()
 
 const app = createApp(App)
 app.provide('ctx', ctx)

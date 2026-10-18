@@ -264,6 +264,24 @@ export const themePlugin = {
       setPreset(id: string) { state.preset = id; state.accent = ''; state.sticker = ''; apply() },
       setAccent(hex: string) { state.accent = hex; apply() },
       setWallpaper(url: string) { state.wallpaper = url; apply() },
+      /** 本地图片上传到图床后设为壁纸（避免 base64 塞 localStorage） */
+      async uploadWallpaper(file: File) {
+        const api: any = ctx.get('api')
+        if (!api?.uploadAndUrl) throw new Error('api 服务未就绪')
+        const { url } = await api.uploadAndUrl(file, 'image')
+        state.wallpaper = url
+        apply()
+        return url
+      },
+      /** 本地图片上传到图床后设为看板娘贴纸 */
+      async uploadSticker(file: File) {
+        const api: any = ctx.get('api')
+        if (!api?.uploadAndUrl) throw new Error('api 服务未就绪')
+        const { url } = await api.uploadAndUrl(file, 'image')
+        state.sticker = url
+        apply()
+        return url
+      },
       setRadius(n: number) { state.radius = Number(n) || 0; apply() },
       setBlur(n: number) { state.blur = Number(n) || 0; apply() },
       setSticker(url: string) { state.sticker = url; apply() },

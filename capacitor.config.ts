@@ -5,9 +5,11 @@
 //   2) androidScheme：Capacitor 默认 https，但本地 server 是自签证书 → TLS 失败黑屏，
 //      必须显式设 http
 export default {
-  appId: 'io.fly1919.yunhu',
-  appName: '云湖客户端',
+  appId: 'com.yhchat.kobe',
+  appName: 'yhchat kobe',
   webDir: 'dist',
+  // WebView 底色与深色主题一致，避免冷启动白/黑闪
+  backgroundColor: '#17181f',
   server: {
     androidScheme: 'http',
     cleartext: true,

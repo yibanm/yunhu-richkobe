@@ -95,6 +95,13 @@ watch(() => cur.value?.id, toBottom)
       <button class="ghost small" @click="ctx.ws.reconnect()">重连</button>
     </div>
 
+    <!-- QQ 式标题栏图标：云湖公开接口没有通话/投屏端点，先占位提示，不假装能用 -->
+    <div class="head-side" v-if="cur">
+      <button class="ghost small icon-btn" title="语音通话" @click="ctx.ui?.toast?.('云湖公开接口暂无通话端点，占位按钮', 'warn')"><Icon name="phone" :size="16" /></button>
+      <button class="ghost small icon-btn" title="视频通话" @click="ctx.ui?.toast?.('云湖公开接口暂无通话端点，占位按钮', 'warn')"><Icon name="video" :size="16" /></button>
+      <button class="ghost small icon-btn" title="屏幕共享" @click="ctx.ui?.toast?.('云湖公开接口暂无投屏端点，占位按钮', 'warn')"><Icon name="screen" :size="16" /></button>
+    </div>
+
     <!-- 插件插槽：其他插件可以往这里塞自己的组件 -->
     <component v-for="(sl, i) in ctx.chat?.slotsOf?.('chat-header-extra') || []" :key="'h' + i"
                :is="sl.component" v-bind="sl.props || {}" />

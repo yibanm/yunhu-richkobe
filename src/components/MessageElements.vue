@@ -20,7 +20,7 @@ import A2uiNode from './A2uiNode.vue'
 const props = defineProps<{
   elements: Element[]
   /** 引用块：{ sender, preview } */
-  quote?: { sender: string; preview: string } | null
+  quote?: { sender: string; preview: string; id?: string } | null
   /** 原始消息（自定义渲染器要用到） */
   msg?: any
 }>()

@@ -242,7 +242,7 @@ try {
       'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
       '-keyout', keyFile, '-out', certFile, '-days', '3650',
       '-subj', '/CN=yunhu-client',
-      '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1,IP:192.168.1.100,IP:2409:8a4c:9e33:4570::9',
+      '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1',
     ], { stdio: 'ignore' })
     console.log('[yunhu] 已自签 HTTPS 证书（自签的，浏览器会提示不安全，手动信任即可）')
   }

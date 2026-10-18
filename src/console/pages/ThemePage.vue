@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 主题页：预设配色 / 主色调 / 壁纸 / 圆角 */
-import { inject, computed } from 'vue'
+import { inject, computed, ref } from 'vue'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
 import { shade } from '../../plugins/theme'
@@ -9,12 +9,30 @@ const ctx = inject<any>('ctx')
 const theme = ctx.theme
 const ui = ctx.ui
 
-const groups = computed(() => [...new Set(theme.presets.map((p: any) => p.group || '内置'))])
+const groups = computed(() => [...new Set<string>(theme.presets.map((p: any) => p.group || '内置'))])
 
 const accent = computed({
   get: () => theme.state.accent || theme.current().accent,
   set: (v: string) => theme.setAccent(v),
 })
+
+/* ---- 本地图片上传（壁纸/贴纸） ---- */
+const wpInput = ref<HTMLInputElement | null>(null)
+const stInput = ref<HTMLInputElement | null>(null)
+const busy = ref(false)
+async function pickUpload(e: any, target: 'wallpaper' | 'sticker') {
+  const f: File | undefined = e.target?.files?.[0]
+  if (e.target) e.target.value = ''
+  if (!f) return
+  busy.value = true
+  try {
+    if (target === 'wallpaper') await theme.uploadWallpaper(f)
+    else await theme.uploadSticker(f)
+    ui.toast('已上传并应用', 'success', 1500)
+  } catch (err: any) {
+    ui.toast('上传失败：' + err.message, 'error')
+  } finally { busy.value = false }
+}
 </script>
 
 <template>
@@ -51,7 +69,9 @@ const accent = computed({
       <div class="rowline">
         <input class="grow" v-model="theme.state.wallpaper" placeholder="图片 URL，留空则不使用" />
         <button class="small" @click="theme.setWallpaper(theme.state.wallpaper)">应用</button>
+        <button class="small" :disabled="busy" @click="wpInput?.click()">上传本地图片</button>
         <button class="ghost small" @click="theme.setWallpaper('')">清除</button>
+        <input ref="wpInput" type="file" accept="image/*" hidden @change="(e: any) => pickUpload(e, 'wallpaper')" />
       </div>
       <div class="rowline mt-sm">
         <span class="dim small">模糊 {{ theme.state.blur }}px</span>
@@ -64,10 +84,12 @@ const accent = computed({
       <div class="rowline">
         <input class="grow" v-model="theme.state.sticker" placeholder="贴纸图片 URL（Doki 主题自带）" />
         <button class="small" @click="theme.setSticker(theme.state.sticker)">应用</button>
+        <button class="small" :disabled="busy" @click="stInput?.click()">上传本地图片</button>
         <button class="ghost small" @click="theme.setSticker('')">清除</button>
         <button class="ghost small" @click="theme.toggleSticker()">
           {{ theme.state.showSticker ? '隐藏' : '显示' }}
         </button>
+        <input ref="stInput" type="file" accept="image/*" hidden @change="(e: any) => pickUpload(e, 'sticker')" />
       </div>
       <div class="rowline mt-sm">
         <span class="dim small">透明度 {{ theme.state.stickerOpacity.toFixed(2) }}</span>

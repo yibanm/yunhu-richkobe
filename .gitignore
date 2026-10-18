@@ -2,7 +2,12 @@ node_modules/
 dist/
 *.log
 
+# 自签证书（server.ts 启动时自动生成，私钥绝不入库）
+certs/
+*.pem
+
 # VitePress 文档站构建产物
 docs-site/.vitepress/dist
 docs-site/.vitepress/cache
 core.*
+.claude/

@@ -27,6 +27,15 @@ const ui = ctx.ui
 
 const busy = ref(false)
 
+/** 当前会话（标题栏展示用） */
+const cur = computed(() => chat.state.current)
+/** 性别选项（云湖接口约定：1 男 2 女 3 其他，见 api.ts getMyProfile 注释） */
+const GENDERS = [
+  { v: 1, n: '男' },
+  { v: 2, n: '女' },
+  { v: 3, n: '其他' },
+]
+
 /* ============ 账号信息 ============ */
 const stats = ref<any>({})          // /v1/user/get-user 的结果
 const meInfo = ref<any>({})         // /v1/user/info 的结果

@@ -10,7 +10,7 @@ import Login from './components/Login.vue'
 import Console from './console/Console.vue'
 import Toasts from './components/Toasts.vue'
 
-const ctx = inject('ctx')
+const ctx = inject<any>('ctx')
 </script>
 
 <template>

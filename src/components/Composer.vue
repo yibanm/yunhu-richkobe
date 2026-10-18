@@ -3,7 +3,7 @@ import { inject, ref, nextTick, computed } from 'vue'
 import QuoteBar from './QuoteBar.vue'
 import { h } from '../satori/element'
 
-const ctx = inject('ctx')
+const ctx = inject<any>('ctx')
 const chat = ctx.chat
 const quickreply = ctx.quickreply
 
@@ -15,8 +15,10 @@ const ta = ref(null)
  * 输入区按钮来自插件注册表 ctx.chat.composerOf('composer')：
  * 「文本/Markdown/HTML」由 chat 插件贡献，「快捷回复」由 quickreply 贡献。
  * 卸载哪个插件，对应按钮就消失。
+ * 快捷回复单独渲染成一行 chips（qr-row），与模式切换按钮视觉区分。
  */
-const barItems = computed(() => chat.composerOf?.('composer') || [])
+const barItems = computed(() => (chat.composerOf?.('composer') || []).filter((it: any) => it.kind !== 'quick'))
+const qrItems = computed(() => (chat.composerOf?.('composer') || []).filter((it: any) => it.kind === 'quick'))
 
 /**
  * 输入处理：
@@ -61,13 +63,8 @@ function onBar(it: any) {
   }
 }
 
-const KINDS_UNUSED = [
-  { v: 1, name: '文本' },
-  { v: 3, name: 'Markdown' },
-  { v: 8, name: 'HTML' },
-]
 const placeholder = computed(() => ({
-  1: '输入消息，Enter 发送 / Shift+Enter 换行',
+  1: '输入消息，Enter 发送 / Shift+Enter 换行；可直接粘贴图片/视频/文件',
   3: 'Markdown：# 标题、**粗体**、`代码`、- 列表 …',
   8: '<b>HTML</b> 消息，支持内联标签',
 }[kind.value]))
@@ -101,20 +98,57 @@ async function onPick(e: any, kind: 'image' | 'file') {
   const f: File | undefined = e.target?.files?.[0]
   if (e.target) e.target.value = ''
   if (!f) return
+  await sendFile(f)
+}
+
+/** 统一上传发送：按 MIME 分流到图片/视频/语音/文件元素 */
+async function sendFile(f: File) {
   uploading.value = true
   try {
     ctx.ui?.toast('上传中…' + f.name, 'info', 1500)
-    const { url } = await ctx.api.uploadAndUrl(f, kind)
-    if (kind === 'image') await chat.sendMedia([h.image(url)])
-    else await chat.sendMedia([h.file(url, f.name, f.size)])
+    if (f.type.startsWith('image/')) {
+      const { url } = await ctx.api.uploadAndUrl(f, 'image')
+      await chat.sendMedia([h.image(url)])
+    } else if (f.type.startsWith('video/')) {
+      await ctx.stickers?.sendVideo?.(f, 0)
+    } else if (f.type.startsWith('audio/')) {
+      await ctx.stickers?.sendAudio?.(f, 0)
+    } else {
+      const { url } = await ctx.api.uploadAndUrl(f, 'file')
+      await chat.sendMedia([h.file(url, f.name, f.size)])
+    }
     ctx.ui?.toast('已发送', 'success', 1500)
   } catch (err: any) {
     ctx.ui?.toast('上传失败：' + err.message, 'error')
   } finally { uploading.value = false }
 }
 
-function onKey(e) {
+/** 粘贴上传：剪贴板里的图片/视频/文件直接发送（需求 8） */
+async function onPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  for (const it of Array.from(items)) {
+    if (it.kind !== 'file') continue
+    const f = it.getAsFile()
+    if (!f) continue
+    e.preventDefault()
+    await sendFile(f)
+    return
+  }
+}
+
+function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); submit() }
+}
+
+/* ---- 快捷回复 chips 管理 ---- */
+const addingQr = ref(false)
+const qrNew = ref('')
+function qrAdd() {
+  const t = qrNew.value.trim()
+  if (t) quickreply?.add?.(t)
+  qrNew.value = ''
+  addingQr.value = false
 }
 </script>
 
@@ -139,11 +173,24 @@ function onKey(e) {
       </span>
     </div>
 
+    <!-- 快捷回复 chips：独立一行、强调色胶囊，与普通按钮明显区分 -->
+    <div v-if="qrItems.length || addingQr" class="qr-row">
+      <button v-for="it in qrItems" :key="it.id" class="qr-chip" @click="onBar(it)">
+        {{ it.label }}
+        <span class="x" title="移除" @click.stop="quickreply?.remove?.(it.value)">×</span>
+      </button>
+      <template v-if="addingQr">
+        <input v-model="qrNew" class="qr-add-input" placeholder="新快捷回复" @keyup.enter="qrAdd" @keyup.esc="addingQr = false" />
+        <button class="ghost tiny" @click="qrAdd">保存</button>
+      </template>
+      <button v-else class="qr-chip qr-add" title="添加快捷回复" @click="addingQr = true">+ 添加</button>
+    </div>
+
     <div class="line">
       <textarea ref="ta" v-model="text" :placeholder="placeholder"
-                @input="onInput" @keydown="onKey"></textarea>
-      <button :disabled="chat.state.sending || !text.trim()" @click="submit">
-        {{ chat.state.sending ? '…' : '发送' }}
+                @input="onInput" @keydown="onKey" @paste="onPaste"></textarea>
+      <button :disabled="chat.state.sending || uploading || !text.trim()" @click="submit">
+        {{ chat.state.sending || uploading ? '…' : '发送' }}
       </button>
     </div>
   </div>

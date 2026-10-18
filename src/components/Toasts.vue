@@ -6,7 +6,7 @@
  */
 import { inject } from 'vue'
 
-const ctx = inject('ctx')
+const ctx = inject<any>('ctx')
 const ui = ctx.ui
 </script>
 

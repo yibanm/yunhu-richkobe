@@ -6,7 +6,7 @@
  */
 import { inject, ref } from 'vue'
 
-const ctx = inject('ctx')
+const ctx = inject<any>('ctx')
 const auth = ctx.auth
 const api = ctx.api
 
