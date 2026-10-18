@@ -33,6 +33,8 @@
     "typescript": "^5.9.0",
     "vite": "^6.0.7",
     "vitepress": "^1.6.4",
-    "vue-tsc": "^3.3.13"
+    "vue-tsc": "^3.3.13",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2"
   }
 }
