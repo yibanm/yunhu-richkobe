@@ -134,8 +134,6 @@ jobs:
 
           ## 变更（自上一 tag）
           $(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~30)..HEAD | head -50 || true)"
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          if ! gh release create "$TAG" artifacts/* --title "云湖牢大版 v$VER" --notes "$NOTES"; then
             gh release upload "$TAG" artifacts/* --clobber
-          else
-            gh release create "$TAG" artifacts/* --title "云湖牢大版 v$VER" --notes "$NOTES"
           fi
