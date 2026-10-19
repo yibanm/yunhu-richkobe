@@ -263,8 +263,18 @@ export const stickersPlugin = {
       catch (e: any) { ui.toast('操作失败：' + e.message, 'error') }
     }
 
+    /** 把一张已在 CDN 的图（消息图片/表情）直接加进表情收藏（右键「收藏」用） */
+    async function addFromUrl(url: string) {
+      if (!url) return ui.toast('没有可收藏的图片地址', 'warn')
+      try {
+        await api.expressionCreate(url)
+        ui.toast('已加入表情收藏', 'success')
+        await load()
+      } catch (e: any) { ui.toast('收藏失败：' + e.message, 'error') }
+    }
+
     const service = {
-      state, load, open, close, send, uploadAndAdd, remove, topping,
+      state, load, open, close, send, uploadAndAdd, remove, topping, addFromUrl,
       loadPacks, createPack, renamePack, deletePack, removePack,
       recordStart, recordStop, sendAudioFile,
       sendVideo, sendVideoFile, recordVideoStart, recordVideoStop,

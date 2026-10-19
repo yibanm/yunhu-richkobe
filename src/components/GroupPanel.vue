@@ -169,7 +169,8 @@ ctx.on('chat/open', loadAll)
         <!-- ============ 群聊 ============ -->
         <template v-else>
         <div v-if="info" class="gp-info">
-          <img :src="info.avatar" alt="" />
+          <img :src="info.avatar ? resUrl(info.avatar) : fallbackAvatar(info.name)" alt=""
+               @error="(e: any) => (e.target.src = fallbackAvatar(info.name))" />
           <div>
             <b>{{ info.name }}</b>
             <div class="dim small">{{ info.headcount }} 人 · {{ info.id }}</div>

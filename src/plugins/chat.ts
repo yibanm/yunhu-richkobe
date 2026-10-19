@@ -709,11 +709,9 @@ export const chatPlugin = {
           tick++
           // E5：后台不轮询，但回到前台要立刻对账一次（visibilitychange 里触发）
           if (document.hidden) return
-          // E8：WS 假死看门狗 —— 45s 没收到任何帧就强制重连
-          const ws: any = (ctx as any).ws
-          if (ws?.online && ws.state?.lastAt && Date.now() - ws.state.lastAt > 45000) ws.reconnect?.()
           // 性能：WS 在线时实时性由推送保证，轮询每 tick 只对账会话列表（未读/预览）；
           // 消息列表每 60s（tick%15）兜底对账一次防推送丢包，WS 离线时每次全量兜底
+          const ws: any = (ctx as any).ws
           const online = !!ws?.online
           if (online && tick % 5 !== 0) return
           loadConversations(true)

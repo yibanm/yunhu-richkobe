@@ -11,6 +11,7 @@ import KSlot from './components/KSlot.vue'
 import MorePanel from './MorePanel.vue'
 import { resUrl } from '../core/res'
 import { fallbackAvatar } from '../core/util'
+import { morePins, toggleMorePin } from '../core/morePins'
 
 const ctx = inject<any>('ctx')
 const console_ = ctx.console
@@ -32,24 +33,10 @@ const COVERED_PATHS = ['/stickers', '/theme', '/logs', '/settings-user', '/plugi
 const railPages = computed(() => pages.value.filter((p: any) => MAIN_PATHS.includes(p.path)))
 /** 「更多功能」宫格展示的插件页（≡ 菜单不再一锅端堆插件页） */
 const morePages = computed(() => pages.value.filter((p: any) => !MAIN_PATHS.includes(p.path) && !COVERED_PATHS.includes(p.path)))
-/**
- * 宫格管理：用户可把插件页「常驻」到 ☰ 菜单（仿 QQ 更多功能的已添加/管理），
- * 其余收拢在宫格里。持久化到 localStorage。
- */
-const MORE_PIN_KEY = 'yh.more.pinned'
-const morePinned = ref<string[]>((() => {
-  try { return JSON.parse(localStorage.getItem(MORE_PIN_KEY) || '[]') } catch { return [] }
-})())
-function togglePinPage(path: string) {
-  const i = morePinned.value.indexOf(path)
-  if (i >= 0) morePinned.value.splice(i, 1)
-  else morePinned.value.push(path)
-  localStorage.setItem(MORE_PIN_KEY, JSON.stringify(morePinned.value))
-}
-/** ☰ 菜单里追加的常驻插件页 */
-const pinnedPages = computed(() => morePages.value.filter((p: any) => morePinned.value.includes(p.path)))
+/** 常驻状态共享给 Sidebar（core/morePins）：侧栏常驻列表与宫格管理同一份数据 */
+const pinnedPages = computed(() => morePages.value.filter((p: any) => morePins.paths.includes(p.path)))
 /** 宫格里展示的（未常驻的） */
-const gridPages = computed(() => morePages.value.filter((p: any) => !morePinned.value.includes(p.path)))
+const gridPages = computed(() => morePages.value.filter((p: any) => !morePins.paths.includes(p.path)))
 const moreOpen2 = ref(false)
 
 /** 总未读（QQ 式角标，挂在「消息」导航上） */
@@ -89,15 +76,10 @@ function pick(what: string) {
   switch (what) {
     case 'fav': go('/stickers'); break                       // 收藏 → 表情页的收藏分区
     case 'files': ctx.group?.setDockTab?.('disk'); break     // 文件 → 当前会话群文件 dock
-    case 'palette': go('/theme'); break                      // 调色盘 → 主题页
-    case 'logs':                                             // 聊天记录管理 → 当前会话记录搜索页签
-      ctx.group?.setDockTab?.('search')
-      ui?.toast?.('已打开当前会话的聊天记录搜索', 'info')
-      break
+    case 'palette': go('/theme'); break                      // 调色盘 → 主题页（用户设置已并入其底部）
     case 'updates': checkUpdate(); break                     // 检查更新 → 真实版本比对
     case 'help': go('/plugins'); break                       // 帮助 → 插件清单页（能力总览）
     case 'lock': ctx.emit('app/lock'); break                 // 锁定 → lock 插件监听
-    case 'settings': go('/settings-user'); break            // 设置 → 用户设置页
     case 'more': moreOpen2.value = true; break               // 更多功能宫格
     case 'logout': auth?.logout?.(); break                   // 退出账号
   }
@@ -140,9 +122,9 @@ async function checkUpdate() {
         </button>
       </div>
       <div class="rail-foot">
-        <button class="rail-btn" :title="ui.state.theme === 'dark' ? '切换到浅色' : '切换到深色'"
+        <button class="rail-btn" :title="ui.state.theme === 'auto' ? '跟随系统（当前' + ui.effectiveTheme + '）' : (ui.effectiveTheme === 'dark' ? '切换到浅色' : '切换到深色')"
                 @click="ui.toggleTheme()">
-          <Icon :name="ui.state.theme === 'dark' ? 'sun' : 'moon'" />
+          <Icon :name="ui.effectiveTheme === 'dark' ? 'moon' : 'sun'" />
         </button>
         <div class="rail-menu-wrap">
           <button class="rail-btn" title="菜单" @click.stop="menuOpen = !menuOpen">
@@ -158,15 +140,6 @@ async function checkUpdate() {
             <button class="rm-item" :disabled="!has('/plugins')" @click="pick('help')"><Icon name="help" :size="15" /> 帮助</button>
             <button class="rm-item" @click="pick('lock')"><Icon name="lock" :size="15" /> 锁定</button>
             <button class="rm-item" @click="pick('more')"><Icon name="grid" :size="15" /> 更多功能</button>
-            <div class="rm-sep"></div>
-            <button class="rm-item" :disabled="!has('/settings-user')" @click="pick('settings')"><Icon name="settings" :size="15" /> 用户设置</button>
-            <!-- 常驻到 ☰ 的插件页（更多功能里管理） -->
-            <template v-if="pinnedPages.length">
-              <div class="rm-sep"></div>
-              <button v-for="p in pinnedPages" :key="p.path" class="rm-item" @click="go(p.path)">
-                <Icon :name="p.icon" :size="15" /> {{ p.name }}
-              </button>
-            </template>
             <div class="rm-sep"></div>
             <button class="rm-item danger" @click="pick('logout')"><Icon name="logout" :size="15" /> 退出账号</button>
           </div>
@@ -202,7 +175,7 @@ async function checkUpdate() {
     <MorePanel v-if="moreOpen2" :pages="gridPages" :pinned="pinnedPages"
                @go="(p: string) => { go(p); moreOpen2 = false }"
                @manage="go('/plugins'); moreOpen2 = false"
-               @pin="togglePinPage"
+               @pin="(p: string) => toggleMorePin(p)"
                @close="moreOpen2 = false" />
   </div>
 </template>

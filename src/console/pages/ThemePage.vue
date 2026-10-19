@@ -3,11 +3,15 @@
 import { inject, computed, ref } from 'vue'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
+import SchemaForm from '../components/SchemaForm.vue'
 import { shade } from '../../plugins/theme'
 
 const ctx = inject<any>('ctx')
 const theme = ctx.theme
 const ui = ctx.ui
+
+/** 用户设置（插件经 ctx.console.settings() 注册）—— 按用户要求并入调色盘底部 */
+const userSettings = computed(() => ctx.console?.state?.settings || [])
 
 const groups = computed(() => [...new Set<string>(theme.presets.map((p: any) => p.group || '内置'))])
 
@@ -115,6 +119,15 @@ async function pickUpload(e: any, target: 'wallpaper' | 'sticker') {
         <span class="bubble-demo">这是一条消息气泡，看看圆角与配色</span>
       </div>
     </KCard>
+
+    <!-- 用户设置（原独立页，按用户要求并入调色盘底部） -->
+    <KCard v-for="s in userSettings" :key="s.id" :title="s.title || s.id" class="mt">
+      <SchemaForm :schema="s.schema" :model-value="s.value || {}" @update:model-value="v => s.value = v" />
+      <div class="acts">
+        <button class="small" @click="ui.toast('已保存（即时生效）', 'success')">保存</button>
+      </div>
+    </KCard>
+    <p v-if="!userSettings.length" class="dim small mt">暂无插件级用户设置。</p>
   </KLayout>
 </template>
 

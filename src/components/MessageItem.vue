@@ -99,7 +99,8 @@ function onA2uiAction(a: any) {
 <template>
   <div v-if="isTip" class="sys">{{ msg.content?.text || msg.content?.tip }}</div>
 
-  <div v-else class="row" :data-mid="msg.id" :class="{ right: msg.right, picked: selected, selecting }"
+  <div v-else class="row" :data-mid="msg.id"
+       :class="{ right: msg.right, picked: selected, selecting, recalled: msg.recalled }"
        @contextmenu="onContextMenu" @click="onClick">
     <span v-if="selecting" class="pick" :class="{ on: selected }">{{ selected ? '✓' : '' }}</span>
 
@@ -119,9 +120,12 @@ function onA2uiAction(a: any) {
         <span class="t">{{ fmtTime(msg.ts) }}</span>
         <span v-if="msg.edited" class="flag">已编辑</span>
       </div>
-      <div class="bubble" :class="'t' + msg.type">
-        <span v-if="msg.recalled" class="recalled">消息已撤回</span>
-        <MessageElements v-else :elements="elements" :quote="quote" :msg="msg"
+      <!-- 撤回：QQ 式居中灰色胶囊，不占气泡 -->
+      <div v-if="msg.recalled" class="recall-capsule">
+        {{ msg.right ? '你' : (msg.sender || '对方') }}撤回了一条消息
+      </div>
+      <div v-else class="bubble" :class="'t' + msg.type">
+        <MessageElements :elements="elements" :quote="quote" :msg="msg"
                          @a2ui-action="onA2uiAction" @quote-jump="id => emit('quote-jump', id)" />
       </div>
     </div>
@@ -150,7 +154,15 @@ function onA2uiAction(a: any) {
 .meta .who { cursor: pointer; }
 .meta .who:hover { color: var(--acc); text-decoration: underline; }
 .row img.av { cursor: pointer; }
-.recalled { font-style: italic; opacity: .6; }
+/* 撤回：整行居中灰色胶囊（QQ 式），隐藏头像/昵称/时间 */
+.row.recalled { justify-content: center; }
+.row.recalled .av, .row.recalled .pick { display: none; }
+.row.recalled .msg-wrap { display: contents; }
+.row.recalled .meta, .row.recalled .mtags { display: none; }
+.recall-capsule {
+  font-size: 12px; color: var(--fg2); background: var(--card2);
+  border-radius: 999px; padding: 3px 12px; margin: 2px 0;
+}
 
 .row.selecting { cursor: pointer; }
 .row.picked .bubble { outline: 2px solid var(--acc); outline-offset: 1px; }

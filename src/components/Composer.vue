@@ -355,12 +355,16 @@ function fmtSize(n: number) {
       </div>
     </div>
 
+    <!-- QQ 式输入区：输入框占满，发送按钮在右下角 -->
     <div class="line">
       <textarea ref="ta" v-model="text" :placeholder="placeholder"
                 @input="onInput" @keydown="onKey" @paste="onPaste"></textarea>
-      <button :disabled="chat.state.sending || uploading || (!text.trim() && !pending.length)" @click="submit">
-        {{ chat.state.sending || uploading ? '…' : '发送' }}
-      </button>
+      <div class="send-row">
+        <span class="hint">{{ pending.length ? pending.length + ' 个附件待发' : '' }}</span>
+        <button :disabled="chat.state.sending || uploading || (!text.trim() && !pending.length)" @click="submit">
+          {{ chat.state.sending || uploading ? '…' : '发送' }}
+        </button>
+      </div>
     </div>
 
     <ImageEditor v-if="editing" :file="editing.file" :url="editing.url"
@@ -381,7 +385,14 @@ function fmtSize(n: number) {
 /* 图标按钮必须零内边距，否则 grid 居中会被 padding 挤偏（实测偏 4px） */
 .bar-row .icon-btn { padding: 0; }
 .bar-row .on { background: var(--acc); color: #fff; border-color: transparent; }
-.line { display: flex; gap: 9px; align-items: flex-end; }
+.line { position: relative; display: flex; }
+.line textarea { width: 100%; padding-bottom: 34px; }   /* 底部留出发送行空间 */
+.send-row {
+  position: absolute; right: 6px; bottom: 6px;
+  display: flex; align-items: center; gap: 10px;
+}
+.send-row .hint { font-size: 11px; color: var(--fg2); }
+.send-row button { height: 28px; padding: 0 18px; font-size: 13px; border-radius: 6px; }
 .rec-dot { font-size: 12px; color: var(--err); flex: 0 0 auto; }
 
 /* 待发送附件预览 */

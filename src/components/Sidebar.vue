@@ -12,7 +12,9 @@
 import { inject, computed, ref, reactive, watch, onUnmounted } from 'vue'
 import { fmtTime, fallbackAvatar } from '../core/util.js'
 import { resUrl } from '../core/res.js'
+import { morePins, toggleMorePin } from '../core/morePins'
 import Icon from '../console/components/Icon.vue'
+import MorePanel from '../console/MorePanel.vue'
 
 const ctx = inject<any>('ctx')
 const auth = ctx.auth
@@ -20,6 +22,15 @@ const chat = ctx.chat
 
 const list = computed(() => chat.filtered())
 function open(c: any) { chat.open(c) }
+
+/* ---- 更多功能宫格（入口在会话列表下方）与常驻功能项 ---- */
+const moreOpen = ref(false)
+/** 可常驻/收拢的插件页（与 Console 宫格同一数据源） */
+const morePages = computed(() =>
+  (ctx.console?.pages || []).filter((p: any) => !['/', '/contacts'].includes(p.path)
+    && !['/stickers', '/theme', '/logs', '/settings-user', '/plugins'].includes(p.path)))
+const pinnedPages = computed(() => morePages.value.filter((p: any) => morePins.paths.includes(p.path)))
+const gridPages = computed(() => morePages.value.filter((p: any) => !morePins.paths.includes(p.path)))
 
 /* ---------------- 会话分组（本地，存 localStorage） ---------------- */
 // 注意：filtered 是函数，必须调用 —— 之前少个括号导致侧栏一条会话都不显示
@@ -209,19 +220,37 @@ async function dlgOk() {
       </li>
     </ul>
 
+    <!-- 常驻功能项 + 更多功能入口（会话列表下方，仿 QQ 侧栏功能区） -->
+    <div class="fn-bar">
+      <button v-for="p in pinnedPages" :key="p.path" class="fn-chip" :title="p.name"
+              @click="ctx.console.goto(p.path)">
+        <Icon :name="p.icon || 'page'" :size="14" /> {{ p.name }}
+      </button>
+      <button class="fn-chip more" title="更多功能（管理常驻项）" @click="moreOpen = true">
+        <Icon name="grid" :size="14" /> 更多功能
+      </button>
+    </div>
+
     <!-- 插槽：chat-sidebar-bottom -->
     <component v-for="(sl, i) in ctx.chat?.slotsOf?.('chat-sidebar-bottom') || []" :key="'sb' + i"
                :is="sl.component" v-bind="sl.props || {}" />
+
+    <!-- 更多功能宫格（管理常驻项） -->
+    <MorePanel v-if="moreOpen" :pages="gridPages" :pinned="pinnedPages"
+               @go="(p: string) => { ctx.console.goto(p); moreOpen = false }"
+               @manage="ctx.console.goto('/plugins'); moreOpen = false"
+               @pin="(p: string) => toggleMorePin(p)"
+               @close="moreOpen = false" />
 
     <!-- 右键分组菜单 -->
     <Teleport to="body">
       <div v-if="menu.open" class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
         <button class="rm-item" @click="togglePin">
-          <Icon name="star" :size="14" /> {{ chat.isPinned(menu.conv?.id) ? '取消置顶' : '置顶' }}
+          <Icon name="pinUp" :size="14" /> {{ chat.isPinned(menu.conv?.id) ? '取消置顶' : '置顶' }}
         </button>
         <div class="rm-sep"></div>
         <div class="rm-item dim small" style="cursor:default">移动到分组</div>
-        <button class="rm-item" @click="assignTo('')"><Icon name="undo" :size="14" /> 移出分组</button>
+        <button v-if="chat.groupOf(menu.conv?.id)" class="rm-item" @click="assignTo('')"><Icon name="undo" :size="14" /> 移出分组</button>
         <button v-for="g in chat.groups.groups" :key="g.id" class="rm-item"
                 :class="{ on: chat.groupOf(menu.conv?.id) === g.id }" @click="assignTo(g.id)">
           <Icon name="folder" :size="14" /> {{ g.name }}

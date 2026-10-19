@@ -68,6 +68,11 @@ export const messageActionsPlugin = {
       { id: 'msg.forward', label: '转发', icon: 'forward', order: 20 },
       { id: 'msg.copy', label: '复制文本', icon: 'copy', order: 30 },
       {
+        // 图片/表情消息右键收藏：表情直接收藏，图片转成表情收藏（云湖 /v1/expression/create）
+        id: 'msg.fav', label: '收藏表情', icon: 'star', order: 35,
+        when: (p: any) => !!(p?.msg?.elements || []).some((e: any) => e.type === 'img' || e.type === 'sticker'),
+      },
+      {
         id: 'msg.edit', label: '编辑', icon: 'pencil', order: 25,
         // 只能编辑自己的文本 / markdown / html 消息
         when: (p: any) => !!p?.msg?.right && !p?.msg?.recalled && [1, 3, 8].includes(p.msg.type),
@@ -115,6 +120,17 @@ export const messageActionsPlugin = {
           // 非安全上下文没有 clipboard API，退化成 prompt
           window.prompt('复制这段文本：', text)
         }
+      },
+    }, ctx)
+
+    /** 收藏表情：取消息里第一张图/表情，直接进表情收藏（图片转表情） */
+    chat.action('msg.fav', {
+      action: ({ msg }: any) => {
+        const el = (msg.elements || []).find((e: any) => e.type === 'img' || e.type === 'sticker')
+        const src = el?.attrs?.src || ''
+        // src 可能是裸 key，补成完整 URL（expression/create 要完整地址）
+        const url = /^https?:/.test(src) ? src : `https://chat-img.jwznb.com/${src}`
+        return (ctx as any).stickers?.addFromUrl?.(url)
       },
     }, ctx)
 

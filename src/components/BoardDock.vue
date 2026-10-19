@@ -105,6 +105,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
       </div>
 
       <span class="grow"></span>
+      <button class="ghost small dock-x" title="关闭" @click="g.closeDock()">×</button>
       <button class="ghost small" title="刷新"
               @click="g.state.dockTab === 'board' ? g.loadBoard() : g.state.dockTab === 'disk' ? g.loadDisk() : g.scanAllBoards()">
         <Icon name="refresh" :size="13" />
@@ -371,12 +372,19 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 <style scoped>
 /* 全屏独立界面：不再挤在输入框上面 */
 .dock {
-  /* 在「右侧内容区」内铺满（.page-area 是定位父级）：
-     既不盖左边导航栏，也不会像 fixed 全屏那样飘在整个窗口上面 */
-  position: absolute; inset: 0; z-index: 30; background: var(--bg);
-  display: flex; flex-direction: column;
+  /* 小窗形态：居中浮在内容区上方（不再铺满整块聊天区），右上 × 可关 */
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(760px, 92%); height: min(600px, 88%);
+  z-index: 30; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .4);
+  display: flex; flex-direction: column; overflow: hidden;
   animation: dock-in .16s ease-out;
 }
+.dock-x {
+  width: 26px; height: 26px; padding: 0; border-radius: 7px; font-size: 17px; line-height: 1;
+  display: grid; place-items: center; flex: 0 0 auto;
+}
+.dock-x:hover { background: var(--card2); color: var(--err); }
 @keyframes dock-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .dock-head {
   display: flex; align-items: center; gap: 10px; padding: 12px 18px; font-size: 13px;

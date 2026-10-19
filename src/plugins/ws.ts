@@ -81,9 +81,13 @@ export const wsPlugin = {
       state.url = await url()
       log('连接', state.url)
       try { socket = new WebSocket(state.url) } catch (e) { return scheduleRetry(e) }
-      socket.binaryType = 'arraybuffer'
+      // 每代 socket 用闭包自引用：重连时旧 socket 的 onclose 会**异步**晚到，
+      // 若不校验身份，它会把新连接的引用清空并误入黄色重连循环（reconnect 竞态根因）
+      const my = socket
+      my.binaryType = 'arraybuffer'
 
-      socket.onopen = () => {
+      my.onopen = () => {
+        if (socket !== my) return
         state.status = 'online'
         retry = 0
         log('已连接，发送登录包')
@@ -95,13 +99,15 @@ export const wsPlugin = {
         hbTimer = setInterval(() => sendJson({ seq: seq(), cmd: 'heartbeat', data: {} }), hbMs)
       }
 
-      socket.onmessage = ev => {
+      my.onmessage = ev => {
+        if (socket !== my) return
         state.lastAt = Date.now()
         if (typeof ev.data === 'string') return onText(ev.data)
         return onBinary(new Uint8Array(ev.data))
       }
 
-      socket.onclose = () => {
+      my.onclose = () => {
+        if (socket !== my) return          // 旧代 socket 的迟到回调，忽略
         state.status = 'closed'
         clearInterval(hbTimer)
         socket = null
@@ -109,7 +115,7 @@ export const wsPlugin = {
         if (!manualClose) scheduleRetry()
       }
 
-      socket.onerror = () => { state.error = 'websocket error'; log('连接错误') }
+      my.onerror = () => { if (socket === my) { state.error = 'websocket error'; log('连接错误') } }
     }
 
     function scheduleRetry(err?: any) {

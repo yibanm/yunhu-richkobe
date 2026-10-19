@@ -16,7 +16,6 @@ import Schema from 'schemastery'
 import { reactive } from 'vue'
 import type { Context } from '../core/context'
 import ThemePage from '../console/pages/ThemePage.vue'
-import SettingsUserPage from '../console/pages/SettingsUserPage.vue'
 
 export interface ThemePreset {
   id: string
@@ -313,7 +312,7 @@ export const themePlugin = {
           value: { preset: 'dark', radius: 8 },
         })
 cc.page({ name: '主题', path: '/theme', icon: 'palette', order: 850, component: ThemePage })
-        cc.page({ name: '用户设置', path: '/settings-user', icon: 'sliders', order: 870, component: SettingsUserPage })
+        // 用户设置已并入主题页底部（用户要求），不再独立成页
       })
     })
   },

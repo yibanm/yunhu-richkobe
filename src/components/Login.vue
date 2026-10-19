@@ -29,8 +29,9 @@ const doToken = () => withBusy(() => auth.loginWithToken(token.value))
 
 <template>
   <div class="login-card">
-    <h1>云湖 · 第三方 Web 客户端</h1>
-    <div class="sub">Vue 3 + Cordis 风格插件架构 · 仅供学习交流</div>
+    <img class="brand" src="../../assets/brand.jpg" alt="云湖牢大版" />
+    <h1>云湖牢大版</h1>
+    <div class="sub">Vue 3 + Cordis 风格插件架构 · fork 自 FLY1919/yunhu-vue · 仅供学习交流</div>
 
     <div class="tabs">
       <button :class="{ on: tab === 'pwd' }" @click="tab = 'pwd'">邮箱登录</button>

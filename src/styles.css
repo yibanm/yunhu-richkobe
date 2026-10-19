@@ -98,6 +98,10 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
   border-radius: 14px; padding: 28px; box-shadow: var(--shadow);
 }
 .login-card h1 { font-size: 19px; margin: 0 0 6px; font-weight: 600; }
+.login-card .brand {
+  display: block; width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+  margin: 0 auto 10px; border: 2px solid var(--line); background: var(--card2);
+}
 .login-card .sub { color: var(--fg2); font-size: 12.5px; margin-bottom: 20px; }
 .login-card label { display: block; font-size: 12.5px; color: var(--fg2); margin: 14px 0 5px; }
 .login-card input { width: 100%; }
@@ -365,9 +369,9 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .composer .kinds, .composer .quick { display: flex; gap: 6px; flex-wrap: wrap; }
 .composer .tiny { padding: 3px 10px; font-size: 12px; border-radius: 7px; }
 .composer .kinds .on { background: var(--acc); color: #fff; border-color: transparent; }
-.composer .line { display: flex; gap: 9px; align-items: flex-end; }
+.composer .line { position: relative; display: flex; }
 .composer textarea { flex: 1; resize: vertical; height: 44px; min-height: 140px; max-height: 40vh; }
-.composer .line > button { height: 44px; padding: 0 20px; }
+.composer .line > button { height: 28px; padding: 0 18px; }
 
 .drawer-mask { display: none; }
 
@@ -577,3 +581,16 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 /* 导航角标（QQ 式总未读） */
 .rail-btn { position: relative; }
 .rail-badge { position: absolute; top: 2px; right: 2px; }
+
+/* 会话列表下方功能区：常驻功能项 + 更多功能入口 */
+.fn-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px;
+  border-top: 1px solid var(--line);
+}
+.fn-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--card2);
+  color: var(--fg2); font-size: 12px; cursor: pointer;
+}
+.fn-chip:hover { background: var(--acc-soft); color: var(--acc); border-color: var(--acc); }
+.fn-chip.more { border-style: dashed; }

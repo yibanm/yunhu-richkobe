@@ -12,7 +12,7 @@
  */
 import { ref, computed, watch, onMounted, nextTick, inject } from 'vue'
 import { resUrl } from '../core/res'
-import { renderMarkdown, sanitizeHtml, postProcess, linkify } from '../core/render'
+import { renderMarkdown, sanitizeHtml, postProcess, linkify, renderRich } from '../core/render'
 import { analyzeA2ui } from '../satori/a2ui'
 import type { Element } from '../satori/element'
 import A2uiNode from './A2uiNode.vue'
@@ -95,6 +95,11 @@ function openVideo(src: string) {
 }
 function closeViewer() { viewer.value = null }
 
+/** 文章卡片：页内弹窗看正文（markdown/HTML 净化渲染） */
+const postView = ref<any>(null)
+function openPost(el: any) { postView.value = el.attrs || null }
+function closePost() { postView.value = null }
+
 async function fix() { await nextTick(); postProcess(body.value) }
 onMounted(fix)
 watch(() => props.elements, fix, { deep: true })
@@ -159,10 +164,11 @@ watch(() => props.elements, fix, { deep: true })
       <!-- 云湖扩展 -->
       <span v-else-if="el.type === 'tip'" class="tip">{{ el.attrs.content }}</span>
       <span v-else-if="el.type === 'call'" class="tip">📞 {{ el.attrs.content || '语音通话' }}</span>
-      <a v-else-if="el.type === 'post'" class="post" href="#" @click.prevent>
+      <!-- 文章卡片：点击在页内打开正文（之前是死链接 @click.prevent 无处理 → 「点不开」） -->
+      <button v-else-if="el.type === 'post'" class="post" @click.stop="openPost(el)">
         <b>{{ el.attrs.title || '文章' }}</b>
         <small v-if="el.attrs.content">{{ String(el.attrs.content).slice(0, 80) }}</small>
-      </a>
+      </button>
 
       <!-- A2UI：组件流 / HTML / markdown 文本 -->
       <template v-else-if="el.type === 'a2ui'">
@@ -203,6 +209,16 @@ watch(() => props.elements, fix, { deep: true })
       <img v-if="viewer.kind === 'image'" :src="viewer.url" alt="" @click.self="closeViewer" />
       <video v-else :src="viewer.url" controls autoplay @click.self="closeViewer"></video>
       <button class="viewer-x" title="关闭" @click="closeViewer">×</button>
+    </div>
+    <!-- 文章弹窗：标题 + 净化渲染正文，右上 × 关闭 -->
+    <div v-if="postView" class="post-mask" @click.self="closePost">
+      <div class="post-box">
+        <div class="post-head">
+          <b>{{ postView.title || '文章' }}</b>
+          <button class="post-x" title="关闭" @click="closePost">×</button>
+        </div>
+        <div class="post-body rich" v-html="renderRich(postView.content || '')"></div>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -245,7 +261,7 @@ watch(() => props.elements, fix, { deep: true })
   font-size: 20px; line-height: 1; cursor: pointer;
 }
 .viewer-x:hover { background: rgba(255, 255, 255, .26); }
-.sticker { max-width: 140px; max-height: 140px; display: block; object-fit: contain; }
+.sticker { max-width: 96px; max-height: 96px; display: block; object-fit: contain; }
 .video-wrap { display: inline-flex; flex-direction: column; gap: 3px; }
 .vtime { font-size: 11px; color: var(--fg2); }
 .pre { font-size: 12px; white-space: pre-wrap; margin: 0; }
@@ -262,3 +278,24 @@ watch(() => props.elements, fix, { deep: true })
 .a2ui-surface { display: flex; flex-direction: column; gap: 6px; }
 .tip { opacity: .85; }
 </style>
+
+/* 文章弹窗 */
+.post-mask {
+  position: fixed; inset: 0; z-index: 93; background: rgba(0, 0, 0, .5);
+  display: grid; place-items: center; backdrop-filter: blur(4px);
+}
+.post-box {
+  width: min(680px, 92vw); max-height: 84vh; display: flex; flex-direction: column;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45); overflow: hidden;
+}
+.post-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 15px;
+}
+.post-x {
+  width: 26px; height: 26px; border-radius: 7px; border: none; background: none;
+  color: var(--fg2); font-size: 17px; line-height: 1; cursor: pointer;
+}
+.post-x:hover { background: var(--card2); color: var(--fg); }
+.post-body { padding: 16px 18px; overflow: auto; font-size: 13.5px; line-height: 1.75; }
