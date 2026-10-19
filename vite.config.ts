@@ -122,7 +122,9 @@ function dataPlugin() {
 export default defineConfig({
   plugins: [vue(), resProxyPlugin(), upProxyPlugin(), configPlugin(), dataPlugin()],
   base: './',
-  build: { outDir: 'dist', target: 'es2022' },
+  // 构建目标 es2020：安卓 WebView（部分设备 Chrome < 90）不支持 es2022 新语法，
+  // JS 一抛异常整页黑屏（WebView 里看不到 console）——es2020 是 Capacitor 官方推荐档
+  build: { outDir: 'dist', target: 'es2020' },
   server: {
     proxy: {
       '/api': {

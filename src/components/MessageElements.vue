@@ -97,7 +97,23 @@ function closeViewer() { viewer.value = null }
 
 /** 文章卡片：页内弹窗看正文（markdown/HTML 净化渲染） */
 const postView = ref<any>(null)
-function openPost(el: any) { postView.value = el.attrs || null }
+const postLoading = ref(false)
+async function openPost(el: any) {
+  const a = el.attrs || {}
+  // 消息里可能只带 post_id 不带正文 → 拉详情补全（之前空弹窗的根因）
+  if (!a.content && a.id) {
+    postLoading.value = true
+    postView.value = { ...a, content: '', loading: true }
+    try {
+      const d = await ctx.api?.baPostDetail?.(Number(a.id))
+      postView.value = { title: d?.title || a.title || '文章', content: d?.content || '', id: a.id }
+    } catch (e: any) {
+      postView.value = { title: a.title || '文章', content: `正文加载失败：${e.message}`, id: a.id }
+    } finally { postLoading.value = false }
+    return
+  }
+  postView.value = a
+}
 function closePost() { postView.value = null }
 
 async function fix() { await nextTick(); postProcess(body.value) }
