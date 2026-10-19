@@ -364,7 +364,7 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
   padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line);
 }
 
-.composer { border-top: 1px solid var(--line); background: var(--card); padding: 10px 14px 13px; }
+.composer { position: relative; border-top: 1px solid var(--line); background: var(--card); padding: 10px 14px 13px; }
 .composer .bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
 .composer .kinds, .composer .quick { display: flex; gap: 6px; flex-wrap: wrap; }
 .composer .tiny { padding: 3px 10px; font-size: 12px; border-radius: 7px; }

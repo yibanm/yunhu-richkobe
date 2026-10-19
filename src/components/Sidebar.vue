@@ -59,6 +59,11 @@ function togglePin() {
   if (menu.conv) chat.togglePin(menu.conv.id)
   closeMenu()
 }
+/** 免打扰开关（本地：不计未读角标） */
+function toggleMute() {
+  if (menu.conv) chat.toggleMute(menu.conv.id)
+  closeMenu()
+}
 /** 删除会话（本地隐藏，不删云端记录；二次确认防误触） */
 async function delConv() {
   const c = menu.conv
@@ -178,7 +183,7 @@ async function dlgOk() {
           <button class="ghost tiny" title="删除分组" @click.stop="chat.removeGroup(g.id)">×</button>
         </li>
         <template v-if="!chat.isCollapsed(g.id)">
-          <li v-for="c in g.items" :key="c.id" :class="{ active: chat.state.current?.id === c.id, 'has-unread': !!c.unread }"
+          <li v-for="c in g.items" :key="c.id" :class="{ active: chat.state.current?.id === c.id, 'has-unread': !!c.unread && !chat.isMuted(c.id) }"
               @click="open(c)" @contextmenu.prevent="openMenu(c, $event)">
             <img :src="c.avatar ? resUrl(c.avatar) : fallbackAvatar(c.name)" alt=""
                  @error="(e: any) => (e.target.src = fallbackAvatar(c.name))" />
@@ -186,12 +191,12 @@ async function dlgOk() {
               <div class="top"><span class="cname">{{ c.at ? '[有人@我] ' : '' }}{{ c.name }}</span><span class="time">{{ fmtTime(c.ts) }}</span></div>
               <div class="prev">{{ c.preview }}</div>
             </div>
-            <span v-if="c.unread" class="badge">{{ c.unread > 99 ? '99+' : c.unread }}</span>
+            <span v-if="c.unread && !chat.isMuted(c.id)" class="badge">{{ c.unread > 99 ? '99+' : c.unread }}</span>
           </li>
         </template>
       </template>
 
-      <li v-for="c in sections.ungrouped" :key="c.id" :class="{ active: chat.state.current?.id === c.id, 'has-unread': !!c.unread }"
+      <li v-for="c in sections.ungrouped" :key="c.id" :class="{ active: chat.state.current?.id === c.id, 'has-unread': !!c.unread && !chat.isMuted(c.id) }"
           @click="open(c)" @contextmenu.prevent="openMenu(c, $event)">
         <img :src="c.avatar ? resUrl(c.avatar) : fallbackAvatar(c.name)" alt=""
              @error="(e: any) => (e.target.src = fallbackAvatar(c.name))" />
@@ -202,7 +207,7 @@ async function dlgOk() {
           </div>
           <div class="prev">{{ c.preview }}</div>
         </div>
-        <span v-if="c.unread" class="badge">{{ c.unread > 99 ? '99+' : c.unread }}</span>
+        <span v-if="c.unread && !chat.isMuted(c.id)" class="badge">{{ c.unread > 99 ? '99+' : c.unread }}</span>
       </li>
       <li v-if="!list.length" class="hint">
         {{ chat.state.loadingConvs ? '加载中…' : '暂无会话' }}
@@ -213,11 +218,15 @@ async function dlgOk() {
     <component v-for="(sl, i) in ctx.chat?.slotsOf?.('chat-sidebar-bottom') || []" :key="'sb' + i"
                :is="sl.component" v-bind="sl.props || {}" />
 
-    <!-- 右键分组菜单 -->
+    <!-- 右键菜单：置顶 / 免打扰 / 移动到分组 / 删除（建分组在侧栏「＋」里） -->
     <Teleport to="body">
       <div v-if="menu.open" class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }" @click.stop>
         <button class="rm-item" @click="togglePin">
           <Icon name="pinUp" :size="14" /> {{ chat.isPinned(menu.conv?.id) ? '取消置顶' : '置顶' }}
+        </button>
+        <button class="rm-item" @click="toggleMute">
+          <Icon :name="chat.isMuted(menu.conv?.id) ? 'bellOn' : 'bellOff'" :size="14" />
+          {{ chat.isMuted(menu.conv?.id) ? '取消免打扰' : '免打扰' }}
         </button>
         <div class="rm-sep"></div>
         <div class="rm-item dim small" style="cursor:default">移动到分组</div>
@@ -226,11 +235,6 @@ async function dlgOk() {
                 :class="{ on: chat.groupOf(menu.conv?.id) === g.id }" @click="assignTo(g.id)">
           <Icon name="folder" :size="14" /> {{ g.name }}
         </button>
-        <div class="rm-sep"></div>
-        <div style="display:flex;gap:6px;padding:4px 6px">
-          <input v-model="menuGroupInput" class="qr-add-input" placeholder="新分组名" @keyup.enter="createAndAssign" />
-          <button class="ghost small" @click="createAndAssign">建</button>
-        </div>
         <div class="rm-sep"></div>
         <button class="rm-item danger" @click="delConv"><Icon name="trash" :size="14" /> 删除会话</button>
       </div>

@@ -13,6 +13,7 @@
 import { inject, ref, computed, onMounted, watch } from 'vue'
 import { resUrl } from '../core/res'
 import { fallbackAvatar } from '../core/util'
+import Icon from '../console/components/Icon.vue'
 
 const ctx = inject<any>('ctx')
 const g = ctx.group
@@ -79,18 +80,26 @@ const isFriend = computed(() => {
 const noDisturb = computed(() => {
   const id = cur.value?.id
   if (!id) return false
-  try { return (ctx.social?.state?.book?.users || []).some((u) => u.id === id && u.noDisturb) } catch { return false }
+  try {
+    const book = ctx.social?.state?.book
+    // 私聊查 users、群聊查 groups（云端 no-notify 两种 chatType 都支持）
+    return (book?.users || []).some((u) => u.id === id && u.noDisturb)
+      || (book?.groups || []).some((g) => g.id === id && g.noDisturb)
+  } catch { return false }
 })
 
-/** 免打扰开关（/v1/friend/no-notify） */
+/** 免打扰开关（/v1/friend/no-notify + 本地角标联动） */
 async function toggleNoDisturb() {
   const id = cur.value?.id
   if (!id) return
+  const next = !noDisturb.value
   try {
-    await ctx.api.noNotify(id, cur.value.type || 1, !noDisturb.value)
-    ctx.ui.toast(noDisturb.value ? '已关闭免打扰' : '已开启免打扰', 'success')
+    await ctx.api.noNotify(id, cur.value.type || 1, next)
+    ctx.ui.toast(next ? '已开启免打扰' : '已关闭免打扰', 'success')
     await ctx.social?.loadBook?.()
-  } catch (e) { ctx.ui.toast('设置失败：' + e.message, 'error') }
+  } catch (e) { ctx.ui.toast('云端设置失败：' + e.message, 'error') }
+  // 本地角标同步（无论云端成败，本地体验一致）
+  if (ctx.chat?.isMuted?.(id) !== next) ctx.chat?.toggleMute?.(id)
 }
 
 function openProfile() {
@@ -178,7 +187,16 @@ ctx.on('chat/open', loadAll)
           </div>
         </div>
 
-        <label class="lab">我在本群的昵称</label>
+        <label class="lab">免打扰</label>
+        <div class="row-inline">
+          <button class="ghost small" :class="{ on: noDisturb }" @click="toggleNoDisturb">
+            <Icon :name="noDisturb ? 'bellOff' : 'bellOn'" :size="14" />
+            {{ noDisturb ? '已开启' : '已关闭' }}
+          </button>
+          <span class="dim small">开启后本群消息不计未读角标</span>
+        </div>
+
+        <label class="lab mt">我在本群的昵称</label>
         <div class="row-inline">
           <input v-model="nick" placeholder="留空则用账号昵称" />
           <button :disabled="busy" @click="saveNick">保存</button>

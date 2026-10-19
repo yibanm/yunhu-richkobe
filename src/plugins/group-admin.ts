@@ -7,7 +7,6 @@ import { reactive } from 'vue'
 import type { Context } from '../core/context'
 import GroupPanel from '../components/GroupPanel.vue'
 import ProfilePanel from '../components/ProfilePanel.vue'
-import SettingsPage from '../console/pages/SettingsPage.vue'
 
 /** 禁言时长（秒），对齐云湖接口允许的取值 */
 export const GAG_OPTIONS = [
@@ -531,9 +530,7 @@ export const groupAdminPlugin = {
         cc.slot({ type: 'global', component: GroupPanel, order: 40 })
         cc.slot({ type: 'global', component: ProfilePanel, order: 41 })
       })
-      ctx.console.addEntry((cc: any) => {
-        cc.page({ name: '设置', path: '/settings', icon: 'sliders', order: 860, component: SettingsPage })
-      })
+      // 原「设置」页已并入「账号」页（AccountPage 内嵌 SettingsPage 片段），不再单独注册
     })
   },
 }

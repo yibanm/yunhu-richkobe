@@ -14,7 +14,6 @@
  *   · /v1/user/save-user-data 是扁平字段
  */
 import { inject, ref, computed, onMounted } from 'vue'
-import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
 import { resUrl } from '../../core/res'
 import { fallbackAvatar, fmtTime } from '../../core/util'
@@ -128,11 +127,12 @@ ctx.on('chat/open', loadAll)
 </script>
 
 <template>
-  <KLayout ns="settings" title="设置" desc="账号信息 · 个人资料 · 群设置">
-    <template #actions>
+  <!-- 片段组件：账号设置内容（嵌入 AccountPage「账号」板块，不再单独成页） -->
+  <div class="set-frag">
+    <div class="set-actions">
       <span class="pill">{{ cur?.name || '未选择会话' }}</span>
       <button class="ghost small" @click="loadAll">刷新</button>
-    </template>
+    </div>
 
     <!-- ============ ① 账号信息 ============ -->
     <KCard title="账号信息">
@@ -223,11 +223,12 @@ ctx.on('chat/open', loadAll)
     </KCard>
 
     <p class="dim small mt">群相关设置已移到「聊天 → 右上角 ⋮ → 群设置 / 成员 / 群标签」里。</p>
-
-  </KLayout>
+  </div>
 </template>
 
 <style scoped>
+.set-frag { display: flex; flex-direction: column; gap: 14px; }
+.set-actions { display: flex; align-items: center; gap: 8px; }
 .row-inline { display: flex; gap: 8px; align-items: center; }
 .row-inline input { flex: 1; min-width: 0; }
 .row-inline .grow { flex: 1; }

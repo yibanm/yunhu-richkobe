@@ -132,6 +132,7 @@ export const chatPlugin = {
       collapsed: JSON.parse(localStorage.getItem('yunhu.conv.collapsed') || '[]') as string[],
       pinned: JSON.parse(localStorage.getItem('yunhu.conv.pinned') || '[]') as string[],
       hidden: JSON.parse(localStorage.getItem('yunhu.conv.hidden') || '[]') as string[],
+      muted: JSON.parse(localStorage.getItem('yunhu.conv.muted') || '[]') as string[],
       editing: false,
     })
     function saveGroups() {
@@ -140,7 +141,16 @@ export const chatPlugin = {
       localStorage.setItem('yunhu.conv.collapsed', JSON.stringify(convGroups.collapsed))
       localStorage.setItem('yunhu.conv.pinned', JSON.stringify(convGroups.pinned))
       localStorage.setItem('yunhu.conv.hidden', JSON.stringify(convGroups.hidden))
+      localStorage.setItem('yunhu.conv.muted', JSON.stringify(convGroups.muted))
     }
+    /** 免打扰（本地）：该会话不计入总未读、侧栏不显示红点（消息照收） */
+    function toggleMute(convId: string) {
+      const i = convGroups.muted.indexOf(convId)
+      if (i >= 0) convGroups.muted.splice(i, 1)
+      else convGroups.muted.push(convId)
+      saveGroups()
+    }
+    const isMuted = (convId: string) => convGroups.muted.includes(convId)
     /** 会话排序：置顶优先，其余按时间倒序 */
     function sortConvs(list: any[]) {
       return [...list].sort((a: any, b: any) => {
@@ -177,6 +187,7 @@ export const chatPlugin = {
         saveGroups()
       },
       isCollapsed(id: string) { return convGroups.collapsed.includes(id) },
+      toggleMute, isMuted,
       /** 置顶（本地排序，云湖无置顶接口） */
       togglePin(convId: string) {
         const i = convGroups.pinned.indexOf(convId)

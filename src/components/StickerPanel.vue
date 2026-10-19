@@ -7,12 +7,21 @@
  * 过滤：url 为空或 CDN 上已不存在的 .tmp 条目直接不显示（否则一片裂图）。
  * 收藏/置顶/删除：expression/create、expression/topping、expression/delete。
  */
-import { inject, computed } from 'vue'
+import { inject, computed, ref, watch } from 'vue'
 import { resUrl } from '../core/res'
 
 const ctx = inject<any>('ctx')
 const st = ctx.stickers
 const s = st.state
+
+/** 页签：收藏 / 各表情包组（之前面板只渲染收藏，表情包组识别不到 —— 补上） */
+const tab = ref<'fav' | number>('fav')
+function pickTab(t: 'fav' | number) {
+  tab.value = t
+  if (t !== 'fav' && !s.packs.length) st.loadPacks?.()
+}
+// 打开面板时顺带拉一次表情包组
+watch(() => s.panelOpen, (v) => { if (v && !s.packs.length) st.loadPacks?.() })
 
 const list = computed(() => {
   // 过滤掉 url 为空的、以及 CDN 上已不存在的 .tmp 条目
@@ -24,6 +33,14 @@ const list = computed(() => {
   if (k) arr = arr.filter((e: any) => String(e.id).includes(k))
   return arr
 })
+
+/** 当前页签的表情包组内容 */
+const packItems = computed(() => {
+  if (tab.value === 'fav') return []
+  const p = (s.packs || []).find((x: any) => x.id === tab.value)
+  return (p?.items || []).filter((e: any) => e.urlOriginal || e.url)
+})
+const curPack = computed(() => (s.packs || []).find((x: any) => x.id === tab.value) || null)
 
 /** 收藏里的 url 是相对 key（expression/xxx.jpg），要补域名 */
 function src(e: any) {
@@ -37,7 +54,7 @@ function src(e: any) {
     <div class="sp">
       <header>
         <b>表情</b>
-        <span class="dim small">{{ s.list.length }} 个收藏</span>
+        <span class="dim small">{{ tab === 'fav' ? s.list.length + ' 个收藏' : (curPack?.name || '') + ' · ' + packItems.length + ' 张' }}</span>
         <span class="grow"></span>
         <input v-model="s.keyword" placeholder="搜索…" style="max-width: 130px" />
         <label class="ghost small file">
@@ -47,17 +64,37 @@ function src(e: any) {
         <button class="sp-x" @click="st.close()">×</button>
       </header>
 
+      <!-- 页签：收藏 + 各表情包组（QQ 式表情面板分组） -->
+      <div class="sp-tabs">
+        <button class="sp-tab" :class="{ on: tab === 'fav' }" @click="pickTab('fav')">收藏</button>
+        <button v-for="p in s.packs" :key="p.id" class="sp-tab" :class="{ on: tab === p.id }" @click="pickTab(p.id)">
+          {{ p.name }} <em>{{ p.items?.length || 0 }}</em>
+        </button>
+        <span v-if="s.packsLoading" class="dim small">加载表情包…</span>
+      </div>
+
       <div class="sp-body">
         <div class="grid">
-          <button v-for="e in list" :key="e.id" class="cell" :title="'点击发送'" @click="st.send(e)">
-            <img :src="src(e)" loading="lazy" alt=""
-                 @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
-            <span class="top" @click.stop="st.topping(e)" title="置顶">↑</span>
-            <span class="del" @click.stop="st.remove(e)" title="从收藏删除">×</span>
-          </button>
+          <template v-if="tab === 'fav'">
+            <button v-for="e in list" :key="e.id" class="cell" :title="'点击发送'" @click="st.send(e)">
+              <img :src="src(e)" loading="lazy" alt=""
+                   @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
+              <span class="top" @click.stop="st.topping(e)" title="置顶">↑</span>
+              <span class="del" @click.stop="st.remove(e)" title="从收藏删除">×</span>
+            </button>
+          </template>
+          <template v-else>
+            <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送'" @click="st.send(e)">
+              <img :src="src(e)" loading="lazy" alt=""
+                   @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
+            </button>
+          </template>
         </div>
-        <p v-if="!list.length" class="dim center">
+        <p v-if="tab === 'fav' && !list.length" class="dim center">
           {{ s.loading ? '加载中…' : '还没有收藏。可以用「上传并收藏」加一张，或在消息图片上右键收藏。' }}
+        </p>
+        <p v-if="tab !== 'fav' && !packItems.length" class="dim center">
+          {{ s.packsLoading ? '加载中…' : '这个表情包是空的' }}
         </p>
       </div>
     </div>
@@ -65,12 +102,20 @@ function src(e: any) {
 </template>
 
 <style scoped>
-.sp-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 190; display: flex; align-items: flex-end; justify-content: center; }
+.sp-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 76; display: flex; align-items: flex-end; justify-content: center; }
 .sp { width: 720px; max-width: 96vw; max-height: 62vh; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: var(--shadow); overflow: hidden; }
 .sp > header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
 .sp > header .grow { flex: 1; }
 .sp-x { background: transparent; color: var(--fg2); font-size: 20px; padding: 0 8px; line-height: 1; }
 .sp-body { overflow: auto; padding: 12px; }
+.sp-tabs { display: flex; gap: 6px; padding: 8px 12px 0; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.sp-tab {
+  padding: 5px 12px 7px; border: none; background: none; color: var(--fg2); font-size: 12.5px;
+  cursor: pointer; border-bottom: 2px solid transparent;
+}
+.sp-tab:hover { color: var(--fg); }
+.sp-tab.on { color: var(--acc); border-bottom-color: var(--acc); font-weight: 600; }
+.sp-tab em { font-style: normal; font-size: 10.5px; color: var(--fg2); margin-left: 3px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
 .cell { position: relative; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 9px; background: var(--card2); padding: 4px; cursor: pointer; overflow: hidden; }
 .cell:hover { border-color: var(--acc); }

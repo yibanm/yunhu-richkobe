@@ -4,6 +4,8 @@ import QuoteBar from './QuoteBar.vue'
 import ImageEditor from './ImageEditor.vue'
 import { h } from '../satori/element'
 import Icon from '../console/components/Icon.vue'
+import { resUrl } from '../core/res'
+import { fallbackAvatar } from '../core/util'
 
 const ctx = inject<any>('ctx')
 const chat = ctx.chat
@@ -64,6 +66,7 @@ const BAR_ICON: Record<string, string> = {
 
 function onInput() {
   autoresize()
+  onInputAt()
   if (!text.value.startsWith('/')) return
   const kw = text.value.slice(1)
   if (/\s/.test(kw)) return
@@ -273,7 +276,55 @@ async function submit() {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); submit() }
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    // @ 成员下拉打开时，Enter 选中当前高亮项而不是发送
+    if (atOpen.value && atList.value.length) { e.preventDefault(); pickAt(atIdx.value); return }
+    e.preventDefault(); submit()
+  }
+  if (atOpen.value) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); atIdx.value = (atIdx.value + 1) % atList.value.length }
+    if (e.key === 'ArrowUp') { e.preventDefault(); atIdx.value = (atIdx.value - 1 + atList.value.length) % atList.value.length }
+    if (e.key === 'Escape') { atOpen.value = false }
+  }
+}
+
+/* ---------------- @成员（QQ 式：输入 @ 弹成员列表，可搜索可选） ---------------- */
+const atOpen = ref(false)
+const atIdx = ref(0)
+const atList = computed<any[]>(() => {
+  if (!atOpen.value) return []
+  const g = ctx.group
+  if (!g || chat.state.current?.type !== 2) return []
+  const kw = atKeyword.value.trim().toLowerCase()
+  const ms = g.state?.members || []
+  return (kw ? ms.filter((m: any) => (m.name || '').toLowerCase().includes(kw)) : ms).slice(0, 8)
+})
+const atKeyword = ref('')
+
+function onInputAt() {
+  // 检测光标前最近的 @ 片段：@xxx（无空格）即处于 at 输入态
+  const el = ta.value
+  if (!el) { atOpen.value = false; return }
+  const before = text.value.slice(0, el.selectionStart ?? text.value.length)
+  const m = before.match(/@([^\s@]{0,12})$/)
+  if (m && chat.state.current?.type === 2) {
+    atKeyword.value = m[1]
+    atIdx.value = 0
+    if (!atOpen.value) { atOpen.value = true; ctx.group?.loadMembers?.() }
+  } else {
+    atOpen.value = false
+  }
+}
+
+function pickAt(i: number) {
+  const m = atList.value[i]
+  if (!m) return
+  const el = ta.value
+  const pos = el?.selectionStart ?? text.value.length
+  const before = text.value.slice(0, pos).replace(/@([^\s@]{0,12})$/, `@${m.name} `)
+  text.value = before + text.value.slice(pos)
+  atOpen.value = false
+  nextTick(() => { autoresize(); el?.focus() })
 }
 
 /* ---- 快捷回复 chips 管理 ---- */
@@ -356,6 +407,16 @@ function fmtSize(n: number) {
     </div>
 
     <!-- QQ 式输入区：输入框占满，发送按钮在右下角 -->
+    <!-- @成员下拉（QQ 式：输入 @ 弹出，可继续输入搜索，↑↓ 选择，Enter 选中） -->
+    <div v-if="atOpen && atList.length" class="at-pop">
+      <button v-for="(m, i) in atList" :key="m.id" class="at-item" :class="{ on: i === atIdx }"
+              @click="pickAt(i)" @mouseenter="atIdx = i">
+        <img :src="m.avatar ? resUrl(m.avatar) : fallbackAvatar(m.name)" alt="" />
+        <span>{{ m.name }}</span>
+        <span class="dim small">{{ m.id }}</span>
+      </button>
+    </div>
+
     <div class="line">
       <textarea ref="ta" v-model="text" :placeholder="placeholder"
                 @input="onInput" @keydown="onKey" @paste="onPaste"></textarea>
@@ -394,6 +455,21 @@ function fmtSize(n: number) {
 .send-row .hint { font-size: 11px; color: var(--fg2); }
 .send-row button { height: 28px; padding: 0 18px; font-size: 13px; border-radius: 6px; }
 .rec-dot { font-size: 12px; color: var(--err); flex: 0 0 auto; }
+
+/* @成员下拉（浮在输入区上方） */
+.at-pop {
+  position: absolute; left: 14px; bottom: 100%; margin-bottom: 6px; z-index: 76;
+  width: min(280px, 80%); max-height: 240px; overflow: auto;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .4); padding: 4px;
+}
+.at-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 6px 8px; border: none; border-radius: 7px; background: none;
+  color: var(--fg); font-size: 13px; cursor: pointer;
+}
+.at-item img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: var(--card2); }
+.at-item.on { background: var(--acc-soft, var(--card2)); color: var(--acc); }
 
 /* 待发送附件预览 */
 .pending { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }

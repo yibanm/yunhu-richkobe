@@ -30,7 +30,7 @@ const pages = computed(() => console_.pages || [])
 /** 主导航只留「消息 / 通讯录」两项（QQ 语义），其余全部进左下 ☰ 菜单 */
 const MAIN_PATHS = ['/', '/contacts']
 /** 固定菜单项已覆盖的页面路径，动态列表里去重，避免同页两项 */
-const COVERED_PATHS = ['/stickers', '/theme', '/logs', '/settings-user', '/plugins', '/about']
+const COVERED_PATHS = ['/theme', '/logs', '/settings-user', '/plugins', '/about']
 const railPages = computed(() => pages.value.filter((p: any) => MAIN_PATHS.includes(p.path)))
 /** 「更多功能」宫格展示的插件页（≡ 菜单不再一锅端堆插件页） */
 const morePages = computed(() => pages.value.filter((p: any) => !MAIN_PATHS.includes(p.path) && !COVERED_PATHS.includes(p.path)))
@@ -46,9 +46,10 @@ function dropPin(target: string) {
   dragPin.value = ''
 }
 
-/** 总未读（QQ 式角标，挂在「消息」导航上） */
+/** 总未读（QQ 式角标，挂在「消息」导航上；免打扰会话不计入） */
 const totalUnread = computed(() =>
-  (ctx.chat?.state?.conversations || []).reduce((n: number, c: any) => n + (c.unread || 0), 0))
+  (ctx.chat?.state?.conversations || []).reduce((n: number, c: any) =>
+    n + (ctx.chat?.isMuted?.(c.id) ? 0 : (c.unread || 0)), 0))
 
 /**
  * 当前页对象。
@@ -81,7 +82,6 @@ function openMe() {
 }
 function pick(what: string) {
   switch (what) {
-    case 'fav': go('/stickers'); break                       // 收藏 → 表情页的收藏分区
     case 'files': ctx.group?.setDockTab?.('disk'); break     // 文件 → 当前会话群文件 dock
     case 'palette': go('/theme'); break                      // 调色盘 → 主题页（用户设置已并入其底部）
     case 'updates': checkUpdate(); break                     // 检查更新 → 真实版本比对
@@ -159,7 +159,6 @@ async function checkUpdate() {
             <Icon name="menu" />
           </button>
           <div v-if="menuOpen" class="rail-menu" @click.stop>
-            <button class="rm-item" :disabled="!has('/stickers')" @click="pick('fav')"><Icon name="star" :size="15" /> 收藏</button>
             <button class="rm-item" @click="pick('files')"><Icon name="folder" :size="15" /> 文件</button>
             <button class="rm-item" :disabled="!has('/theme')" @click="pick('palette')"><Icon name="palette" :size="15" /> 调色盘</button>
             <div class="rm-sep"></div>

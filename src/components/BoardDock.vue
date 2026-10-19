@@ -200,7 +200,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
           <div class="ginfo-grid">
             <div class="kv"><span class="k">群简介</span><span>{{ g.state.info.introduction || '—' }}</span></div>
             <div class="kv"><span class="k">群主</span><span>{{ g.state.info.createBy || '—' }}</span></div>
-            <div class="kv"><span class="k">创建时间</span><span>{{ g.state.info.createTime ? fmtTime(g.state.info.createTime) : '—' }}</span></div>
+            <div class="kv"><span class="k">创建时间</span><span class="dim">云湖接口不返回该字段</span></div>
           </div>
           <p class="dim small">接口：/v1/group/info（GroupInfoRequest{group_id=2}）</p>
         </div>

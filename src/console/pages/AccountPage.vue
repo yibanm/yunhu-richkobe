@@ -1,8 +1,9 @@
 <script setup lang="ts">
-/** 账号页 */
+/** 账号页（含原「设置」板块内容：账号信息/个人资料，设置板块已并入此处） */
 import { inject, computed } from 'vue'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
+import SettingsFrag from './SettingsPage.vue'
 import { resUrl } from '../../core/res.js'
 import { fallbackAvatar } from '../../core/util.js'
 
@@ -63,5 +64,8 @@ const wsText = computed(() => ({
         资源经本站 <code>/res</code> 代理补 Referer 防盗链头后加载。
       </p>
     </KCard>
+
+    <!-- 原「设置」板块并入账号页（账号信息 / 个人资料可改） -->
+    <SettingsFrag class="mt" />
   </KLayout>
 </template>
