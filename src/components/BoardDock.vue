@@ -369,20 +369,20 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 <style scoped>
 /* 全屏独立界面：不再挤在输入框上面 */
 .dock {
-  /* 小窗形态：居中浮在内容区上方（不再铺满整块聊天区），右上 × 可关 */
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(760px, 92%); height: min(600px, 88%);
-  z-index: 30; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .4);
+  /* QQ 式右侧抽屉：群成员/群文件/看板从右侧滑出，不遮会话列表 */
+  position: fixed; right: 0; top: 0; bottom: 28px;
+  width: min(440px, 92vw);
+  z-index: 30; background: var(--card); border-left: 1px solid var(--line);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, .35);
   display: flex; flex-direction: column; overflow: hidden;
-  animation: dock-in .16s ease-out;
+  animation: dock-in .18s ease-out;
 }
 .dock-x {
   width: 26px; height: 26px; padding: 0; border-radius: 7px; font-size: 17px; line-height: 1;
   display: grid; place-items: center; flex: 0 0 auto;
 }
 .dock-x:hover { background: var(--card2); color: var(--err); }
-@keyframes dock-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes dock-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 .dock-head {
   display: flex; align-items: center; gap: 10px; padding: 12px 18px; font-size: 13px;
   border-bottom: 1px solid var(--line); background: var(--card);
