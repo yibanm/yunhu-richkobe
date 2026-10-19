@@ -12,13 +12,29 @@ export const uiPlugin = {
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
     const sysDark = () => mq?.matches ?? true
     const effective = (t: string) => (t === 'auto' ? (sysDark() ? 'dark' : 'light') : t)
-    const state = reactive({ theme: saved, toasts: [] as any[], panel: 'chat' })
+    const state = reactive({ theme: saved, toasts: [] as any[], panel: 'chat', confirmReq: null as any })
     let seq = 0
+    let confirmResolve: ((ok: boolean) => void) | null = null
 
     const ui = {
       state,
       /** 实际生效的主题（auto 解析后） */
       get effectiveTheme() { return effective(state.theme) },
+      /**
+       * web 确认框（替代 window.confirm）：返回 Promise<boolean>。
+       * 全局单例；同一时刻只允许一个，后发的顶掉前一个（前一个按 false 结算）。
+       */
+      confirm(title: string, message = '', opts: { okText?: string; cancelText?: string; danger?: boolean } = {}): Promise<boolean> {
+        if (confirmResolve) confirmResolve(false)
+        state.confirmReq = { title, message, ...opts }
+        return new Promise<boolean>((resolve) => { confirmResolve = resolve })
+      },
+      resolveConfirm(ok: boolean) {
+        state.confirmReq = null
+        const r = confirmResolve
+        confirmResolve = null
+        r?.(ok)
+      },
       toast(text: string, type = 'info', ms = 3200) {
         const id = ++seq
         state.toasts.push({ id, text, type })

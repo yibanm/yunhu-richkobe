@@ -99,17 +99,14 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
         <button class="ghost small" :class="{ on: g.state.dockTab === 'all' }" @click="g.setDockTab('all')">
           <Icon name="search" :size="13" /> 全部看板
         </button>
-        <button class="ghost small dock-exit" title="退出" @click="g.closeDock()">
-          <Icon name="logout" :size="13" /> 退出
-        </button>
       </div>
 
       <span class="grow"></span>
-      <button class="ghost small dock-x" title="关闭" @click="g.closeDock()">×</button>
       <button class="ghost small" title="刷新"
               @click="g.state.dockTab === 'board' ? g.loadBoard() : g.state.dockTab === 'disk' ? g.loadDisk() : g.scanAllBoards()">
         <Icon name="refresh" :size="13" />
       </button>
+      <button class="ghost small dock-x" title="关闭" @click="g.closeDock()">×</button>
     </div>
 
     <div v-show="g.state.boardOpen" class="dock-body">

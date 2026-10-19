@@ -254,7 +254,7 @@ export const stickersPlugin = {
       catch (e: any) { ui.toast('重命名失败：' + e.message, 'error') }
     }
     async function deletePack(p: any) {
-      if (!window.confirm(`删除表情包「${p.name}」？不可恢复`)) return
+      if (!(await ui.confirm('删除表情包', `删除表情包「${p.name}」？不可恢复`, { danger: true }))) return
       try { await api.stickerDeletePack(p.id); ui.toast('已删除', 'success'); await loadPacks() }
       catch (e: any) { ui.toast('删除失败：' + e.message, 'error') }
     }

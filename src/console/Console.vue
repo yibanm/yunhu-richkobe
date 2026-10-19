@@ -9,6 +9,7 @@ import { inject, computed, ref, watch } from 'vue'
 import Icon from './components/Icon.vue'
 import KSlot from './components/KSlot.vue'
 import MorePanel from './MorePanel.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 import { resUrl } from '../core/res'
 import { fallbackAvatar } from '../core/util'
 import { morePins, toggleMorePin } from '../core/morePins'
@@ -91,12 +92,19 @@ async function checkUpdate() {
   ui?.toast?.('正在检查更新…', 'info')
   try {
     const r = await fetch('/update-check')
+    if (!r.ok) { ui?.toast?.('暂时无法检查更新（服务未就绪）', 'warn'); return }
     const j = await r.json()
     const cur = ctx.app?.version || '1.0.0'
     if (!j.ok) { ui?.toast?.('暂时无法检查更新（' + (j.msg || '网络') + '）', 'warn'); return }
     const tag = String(j.tag || '').replace(/^v/, '')
-    if (tag && tag !== cur) {
-      ui?.toast?.(`发现新版本 v${tag}：${j.name || ''}（${j.url || '见 Release 页'}）`, 'success')
+    // semver 比较：只有远端**更高**才提示新版本（相同/更低都算最新）
+    const cmp = (a: string, b: string) => {
+      const pa = a.split('.').map(Number), pb = b.split('.').map(Number)
+      for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0) }
+      return 0
+    }
+    if (tag && cmp(tag, cur) > 0) {
+      ui?.toast?.(`发现新版本 v${tag}：${j.name || ''}`, 'success')
       if (j.url) window.open(j.url, '_blank')
     } else {
       ui?.toast?.(`已是最新版本（牢大版 v${cur}）`, 'info')
@@ -120,6 +128,16 @@ async function checkUpdate() {
           <Icon :name="p.icon" />
           <span v-if="p.path === '/' && totalUnread" class="badge rail-badge">{{ totalUnread > 99 ? '99+' : totalUnread }}</span>
         </button>
+        <!-- 常驻功能项（更多功能里自定义）：图标进 rail，群聊(通讯录)下方 -->
+        <button v-for="p in pinnedPages" :key="p.path"
+                class="rail-btn" :class="{ on: active?.path === p.path }"
+                :title="p.name" @click="current = p.path">
+          <Icon :name="p.icon || 'page'" />
+        </button>
+        <!-- 更多功能入口：群聊图标下方 -->
+        <button class="rail-btn" :class="{ on: moreOpen2 }" title="更多功能" @click.stop="moreOpen2 = !moreOpen2">
+          <Icon name="grid" />
+        </button>
       </div>
       <div class="rail-foot">
         <button class="rail-btn" :title="ui.state.theme === 'auto' ? '跟随系统（当前' + ui.effectiveTheme + '）' : (ui.effectiveTheme === 'dark' ? '切换到浅色' : '切换到深色')"
@@ -138,7 +156,6 @@ async function checkUpdate() {
             <button class="rm-item" @click="pick('updates')"><Icon name="download" :size="15" /> 检查更新</button>
             <button class="rm-item" :disabled="!has('/plugins')" @click="pick('help')"><Icon name="help" :size="15" /> 帮助</button>
             <button class="rm-item" @click="pick('lock')"><Icon name="lock" :size="15" /> 锁定</button>
-            <button class="rm-item" @click="pick('more')"><Icon name="grid" :size="15" /> 更多功能</button>
             <div class="rm-sep"></div>
             <button class="rm-item danger" @click="pick('logout')"><Icon name="logout" :size="15" /> 退出账号</button>
           </div>
@@ -169,6 +186,9 @@ async function checkUpdate() {
     </footer>
 
     <KSlot name="global" />
+
+    <!-- 统一 web 确认框（替代 window.confirm，z-index 最高档） -->
+    <ConfirmDialog />
 
     <!-- 更多功能宫格（仿 QQ 截图 3，含常驻管理） -->
     <MorePanel v-if="moreOpen2" :pages="gridPages" :pinned="pinnedPages"

@@ -110,7 +110,7 @@ async function addFriend() {
 
 async function kickFriend() {
   const c = cur.value
-  if (!c || !window.confirm(`确定删除好友「${c.name}」？`)) return
+  if (!c || !(await ctx.ui.confirm('删除好友', `确定删除好友「${c.name}」？`, { danger: true }))) return
   try {
     await ctx.api.deleteFriend(c.id, c.type === 3 ? 3 : 1)
     ctx.ui.toast('已删除好友', 'success')

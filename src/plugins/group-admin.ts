@@ -187,7 +187,7 @@ export const groupAdminPlugin = {
 
     async function kick(m: any) {
       const gid = requireGroup(); if (!gid) return
-      if (!window.confirm(`确定把「${m.name}」踢出本群？`)) return
+      if (!(await ui.confirm('踢出成员', `确定把「${m.name}」踢出本群？`, { danger: true }))) return
       try {
         await api.kickMember(gid, m.id)
         ui.toast(`已踢出 ${m.name}`, 'success')
@@ -365,7 +365,7 @@ export const groupAdminPlugin = {
     /** 删除标签 */
     async function removeTag(t: any) {
       const gid = requireGroup(); if (!gid) return
-      if (!window.confirm(`删除标签「${t.tag}」？`)) return
+      if (!(await ui.confirm('删除标签', `删除标签「${t.tag}」？`, { danger: true }))) return
       try { await api.deleteTag(gid, t.id); await loadTags(); ui.toast('已删除', 'success') }
       catch (e: any) { ui.toast('删除失败：' + e.message, 'error') }
     }

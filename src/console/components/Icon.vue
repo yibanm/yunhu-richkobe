@@ -63,7 +63,7 @@ const PATHS = {
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
   plus: 'M12 5v14M5 12h14',
   trash: 'M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6',
-  pinUp: 'M12 19V5M5 12l7-7 7 7',
+  pinUp: 'M9 4h6l-1 7 3 3v2H7v-2l3-3zM12 16v5',
 }
 </script>
 

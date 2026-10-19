@@ -177,7 +177,7 @@ export const messageActionsPlugin = {
     chat.action('sel.recall', {
       action: async () => {
         const ids = chat.state.selected.slice()
-        if (!window.confirm(`确定撤回选中的 ${ids.length} 条消息？`)) return
+        if (!(await ui.confirm('批量撤回', `确定撤回选中的 ${ids.length} 条消息？`, { danger: true }))) return
         await chat.recall(ids)
       },
     }, ctx)

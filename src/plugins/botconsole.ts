@@ -76,7 +76,7 @@ export const botConsolePlugin = {
     }
 
     async function resetToken(botId: string) {
-      if (!window.confirm('重置 Token 会让旧 Token 立刻失效，确定？')) return
+      if (!(await (ctx as any).ui?.confirm?.('重置 Token', '重置 Token 会让旧 Token 立刻失效，确定？', { danger: true }))) return
       try {
         const t = await api.resetBotToken(botId)
         if (t) window.prompt('新 Token（已复制到提示框）：', t)

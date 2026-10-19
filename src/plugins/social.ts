@@ -78,7 +78,11 @@ export const socialPlugin = {
       try {
         // 云湖创建群聊强制要头像（avatar_url 空会回「头像不合规」）——默认用发起人自己的头像
         const avatar = ctx.get('auth')?.state?.user?.avatar || ''
-        const id: string = await api.createGroup(name, introduction, avatar)
+        // 15s 超时兜底：云端偶发不响应时不再让对话框永远「提交中」
+        const id: string = await Promise.race([
+          api.createGroup(name, introduction, avatar),
+          new Promise<string>((_, rej) => setTimeout(() => rej(new Error('创建超时（15s），请检查网络后重试')), 15000)),
+        ])
         ui.toast(id ? `群聊已创建（ID ${id}）` : '群聊已创建', 'success')
         ctx.emit('chat/refresh' as any)
         await loadBook()
