@@ -3,7 +3,7 @@
  * 控制台外壳（对标 Koishi Console + QQ 客户端导航语义）
  *   · 导航栏按「已注册页面」动态生成 —— 插件装载/卸载，导航项即时增减
  *   · 顶部头像 = 我的资料（QQ 语义）；底部 ☰ = 全局菜单
- *     （收藏/文件/调色盘/聊天记录管理/检查更新/帮助/锁定/设置/退出账号）
+ *     （收藏/文件/调色盘/检查更新/帮助/锁定/更多功能/退出账号）
  */
 import { inject, computed, ref, watch } from 'vue'
 import Icon from './components/Icon.vue'
@@ -135,7 +135,6 @@ async function checkUpdate() {
             <button class="rm-item" @click="pick('files')"><Icon name="folder" :size="15" /> 文件</button>
             <button class="rm-item" :disabled="!has('/theme')" @click="pick('palette')"><Icon name="palette" :size="15" /> 调色盘</button>
             <div class="rm-sep"></div>
-            <button class="rm-item" :disabled="!has('/logs')" @click="pick('logs')"><Icon name="clock" :size="15" /> 聊天记录管理</button>
             <button class="rm-item" @click="pick('updates')"><Icon name="download" :size="15" /> 检查更新</button>
             <button class="rm-item" :disabled="!has('/plugins')" @click="pick('help')"><Icon name="help" :size="15" /> 帮助</button>
             <button class="rm-item" @click="pick('lock')"><Icon name="lock" :size="15" /> 锁定</button>
