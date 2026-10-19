@@ -372,7 +372,8 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
   /* QQ 式右侧抽屉：群成员/群文件/看板从右侧滑出，不遮会话列表 */
   position: fixed; right: 0; top: 0; bottom: 28px;
   width: min(440px, 92vw);
-  z-index: 30; background: var(--card); border-left: 1px solid var(--line);
+  /* 层级：高于三栏(60/65/70)与 rail 菜单，低于对话框(80+) —— 点开即在所有组件最上层 */
+  z-index: 75; background: var(--card); border-left: 1px solid var(--line);
   box-shadow: -12px 0 40px rgba(0, 0, 0, .35);
   display: flex; flex-direction: column; overflow: hidden;
   animation: dock-in .18s ease-out;
@@ -392,7 +393,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 .dock-head .owner { display: inline-flex; align-items: center; gap: 4px; color: var(--fg2); }
 .dock-head .owner img { width: 16px; height: 16px; border-radius: 50%; }
 .bot-sel { font-size: 12px; padding: 3px 6px; max-width: 170px; }
-.dock-body { flex: 1; overflow: auto; padding: 14px 18px; }
+.dock-body { flex: 1; overflow: auto; padding: 14px 18px; background: var(--card); }
 .dock-body .rich :deep(img) { max-width: 100%; border-radius: 8px; }
 .dock-body .rich :deep(a) { color: var(--acc); }
 .dock-body .rich :deep(h1), .dock-body .rich :deep(h2), .dock-body .rich :deep(h3) { margin: 6px 0; }
@@ -408,7 +409,9 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 .dock-exit:hover { background: color-mix(in srgb, var(--err) 14%, transparent); color: var(--err); }
 .dock-head .grow { flex: 1; }
 .dock-tabs .on { background: var(--acc-soft); border-color: var(--acc); color: var(--acc); }
-.dock-tabs button { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; font-size: 12px; }
+.dock-tabs button { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; font-size: 12px; height: 28px; }
+/* 头部所有按钮（页签/刷新/×）统一 28px 高，与聊天标题栏按钮同尺寸协调 */
+.dock-head > button { height: 28px; min-width: 28px; display: inline-grid; place-items: center; padding: 0 6px; }
 .gp-search { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .gp-search input { flex: 1; }
 .dock-members { list-style: none; margin: 0; padding: 0; }

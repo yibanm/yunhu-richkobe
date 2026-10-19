@@ -12,7 +12,7 @@ import MorePanel from './MorePanel.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import { resUrl } from '../core/res'
 import { fallbackAvatar } from '../core/util'
-import { morePins, toggleMorePin } from '../core/morePins'
+import { morePins, toggleMorePin, moveMorePin } from '../core/morePins'
 
 const ctx = inject<any>('ctx')
 const console_ = ctx.console
@@ -30,7 +30,7 @@ const pages = computed(() => console_.pages || [])
 /** 主导航只留「消息 / 通讯录」两项（QQ 语义），其余全部进左下 ☰ 菜单 */
 const MAIN_PATHS = ['/', '/contacts']
 /** 固定菜单项已覆盖的页面路径，动态列表里去重，避免同页两项 */
-const COVERED_PATHS = ['/stickers', '/theme', '/logs', '/settings-user', '/plugins']
+const COVERED_PATHS = ['/stickers', '/theme', '/logs', '/settings-user', '/plugins', '/about']
 const railPages = computed(() => pages.value.filter((p: any) => MAIN_PATHS.includes(p.path)))
 /** 「更多功能」宫格展示的插件页（≡ 菜单不再一锅端堆插件页） */
 const morePages = computed(() => pages.value.filter((p: any) => !MAIN_PATHS.includes(p.path) && !COVERED_PATHS.includes(p.path)))
@@ -39,6 +39,12 @@ const pinnedPages = computed(() => morePages.value.filter((p: any) => morePins.p
 /** 宫格里展示的（未常驻的） */
 const gridPages = computed(() => morePages.value.filter((p: any) => !morePins.paths.includes(p.path)))
 const moreOpen2 = ref(false)
+/** rail 常驻图标拖拽排序 */
+const dragPin = ref('')
+function dropPin(target: string) {
+  if (dragPin.value && dragPin.value !== target) moveMorePin(dragPin.value, target)
+  dragPin.value = ''
+}
 
 /** 总未读（QQ 式角标，挂在「消息」导航上） */
 const totalUnread = computed(() =>
@@ -131,7 +137,11 @@ async function checkUpdate() {
         <!-- 常驻功能项（更多功能里自定义）：图标进 rail，群聊(通讯录)下方 -->
         <button v-for="p in pinnedPages" :key="p.path"
                 class="rail-btn" :class="{ on: active?.path === p.path }"
-                :title="p.name" @click="current = p.path">
+                :title="p.name + '（可拖拽排序）'" draggable="true"
+                @click="current = p.path"
+                @dragstart="dragPin = p.path"
+                @dragover.prevent
+                @drop.prevent="dropPin(p.path)">
           <Icon :name="p.icon || 'page'" />
         </button>
         <!-- 更多功能入口：群聊图标下方 -->
@@ -155,6 +165,7 @@ async function checkUpdate() {
             <div class="rm-sep"></div>
             <button class="rm-item" @click="pick('updates')"><Icon name="download" :size="15" /> 检查更新</button>
             <button class="rm-item" :disabled="!has('/plugins')" @click="pick('help')"><Icon name="help" :size="15" /> 帮助</button>
+            <button class="rm-item" :disabled="!has('/about')" @click="go('/about')"><Icon name="star" :size="15" /> 关于</button>
             <button class="rm-item" @click="pick('lock')"><Icon name="lock" :size="15" /> 锁定</button>
             <div class="rm-sep"></div>
             <button class="rm-item danger" @click="pick('logout')"><Icon name="logout" :size="15" /> 退出账号</button>

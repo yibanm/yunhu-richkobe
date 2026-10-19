@@ -98,6 +98,13 @@ function closeViewer() { viewer.value = null }
 /** 文章卡片：页内弹窗看正文（markdown/HTML 净化渲染） */
 const postView = ref<any>(null)
 const postLoading = ref(false)
+const postBody = ref<HTMLElement | null>(null)
+// 弹窗正文渲染后把图片/资源链接改写到 /res 代理（防盗链 Referer，否则带图文章图全裂）
+watch(postView, async (v) => {
+  if (!v) return
+  await nextTick()
+  if (postBody.value) postProcess(postBody.value)
+})
 async function openPost(el: any) {
   const a = el.attrs || {}
   // 消息里可能只带 post_id 不带正文 → 拉详情补全（之前空弹窗的根因）
@@ -106,7 +113,9 @@ async function openPost(el: any) {
     postView.value = { ...a, content: '', loading: true }
     try {
       const d = await ctx.api?.baPostDetail?.(Number(a.id))
-      postView.value = { title: d?.title || a.title || '文章', content: d?.content || '', id: a.id }
+      // 详情字段兼容：content / body / text 都可能出现
+      const body = d?.content ?? d?.body ?? d?.text ?? ''
+      postView.value = { title: d?.title || a.title || '文章', content: body, id: a.id }
     } catch (e: any) {
       postView.value = { title: a.title || '文章', content: `正文加载失败：${e.message}`, id: a.id }
     } finally { postLoading.value = false }
@@ -233,7 +242,7 @@ watch(() => props.elements, fix, { deep: true })
           <b>{{ postView.title || '文章' }}</b>
           <button class="post-x" title="关闭" @click="closePost">×</button>
         </div>
-        <div class="post-body rich" v-html="renderRich(postView.content || '')"></div>
+        <div ref="postBody" class="post-body rich" v-html="renderRich(postView.content || '')"></div>
       </div>
     </div>
   </Teleport>

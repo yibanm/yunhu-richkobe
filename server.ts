@@ -29,14 +29,60 @@ const ROOT: string = join(__dirname, 'dist')
 const CONFIG_FILE: string = join(__dirname, 'yunhu.config.yml')
 
 /* ============ 用户数据目录（登录态/会话缓存/锁屏 PIN/扫码中继） ============
- * 默认落在「文档/yhchat」，可用环境变量 YH_DATA_DIR 覆盖（桌面端注入 userData 子目录）。
+ * 解析顺序：YH_DATA_DIR 环境变量 → 用户自定义（~/.yhchat-dir 文件）→ 默认「文档/yhchat」。
+ * 自定义目录经 GET/PUT /data-dir 读写；PUT 时把旧目录里的数据文件搬过去（尽力而为）。
  * 只允许白名单内的文件名，防止路径穿越写到任意位置。
  */
-const DATA_DIR: string = process.env.YH_DATA_DIR || join(homedir(), 'Documents', 'yhchat')
+const DATA_DIR_FILE = join(homedir(), '.yhchat-dir')
 const DATA_ALLOW = new Set(['session', 'cache', 'pin', 'lock', 'relay'])
 const DATA_MAX_BYTES = 2 * 1024 * 1024   // 会话快照可能较大，限 2MB 足够且防滥用
 const JSON_HDR = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
+
+function defaultDataDir(): string { return join(homedir(), 'Documents', 'yhchat') }
+function resolveDataDir(): string {
+  if (process.env.YH_DATA_DIR) return process.env.YH_DATA_DIR
+  try {
+    const custom = readFileSync(DATA_DIR_FILE, 'utf8').trim()
+    if (custom) return custom
+  } catch { /* 没有自定义就用默认 */ }
+  return defaultDataDir()
+}
+let DATA_DIR = resolveDataDir()
 try { mkdirSync(DATA_DIR, { recursive: true }) } catch { /* 目录建不起来时 /data 请求会各自报错，不影响其他路由 */ }
+
+/** PUT /data-dir：改自定义目录并搬迁已有数据文件 */
+async function handleDataDir(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  if (req.method === 'GET') {
+    res.writeHead(200, JSON_HDR)
+    res.end(JSON.stringify({ dir: DATA_DIR, custom: existsSync(DATA_DIR_FILE), default: defaultDataDir() }))
+    return
+  }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req))
+      const dir = String(body.dir || '').trim()
+      if (!dir || dir.length > 260) { res.writeHead(400, JSON_HDR).end(JSON.stringify({ ok: false, msg: '目录路径不合法' })); return }
+      mkdirSync(dir, { recursive: true })
+      // 搬迁旧目录数据（同名覆盖跳过，失败不阻断）
+      for (const name of DATA_ALLOW) {
+        const from = join(DATA_DIR, name + '.json')
+        const to = join(dir, name + '.json')
+        if (existsSync(from) && !existsSync(to)) {
+          await writeFile(to, await readFile(from, 'utf8'), 'utf8').catch(() => {})
+        }
+      }
+      await writeFile(DATA_DIR_FILE, dir, 'utf8')
+      DATA_DIR = dir
+      res.writeHead(200, JSON_HDR)
+      res.end(JSON.stringify({ ok: true, dir }))
+    } catch (e: any) {
+      res.writeHead(500, JSON_HDR)
+      res.end(JSON.stringify({ ok: false, msg: e.message }))
+    }
+    return
+  }
+  res.writeHead(405).end('method not allowed')
+}
 
 const DEFAULT_CONFIG = `# 云湖第三方客户端配置
 app:
@@ -261,6 +307,7 @@ function serverApp(req: any, res: any) {
   // 用户数据落盘（登录态/会话缓存/PIN/锁/扫码中继）
   const dataM = pathname.match(/^\/data\/([a-z]+)$/)
   if (dataM) { handleData(req, res, dataM[1]); return }
+  if (pathname === '/data-dir') { handleDataDir(req, res).catch(e => { res.writeHead(500, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
   if (pathname === '/update-check' && req.method === 'GET') { handleUpdateCheck(res).catch(e => { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
   // 标准 Satori 协议端点
   if (pathname.startsWith('/satori/')) {

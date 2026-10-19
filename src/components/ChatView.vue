@@ -41,6 +41,21 @@ const flow = computed(() => {
 /** 右上角「⋮」菜单 */
 const moreOpen = ref(false)
 const moreAll = ref(false)   // 「显示其他」是否展开
+const moreBtn = ref<HTMLElement | null>(null)
+/** ⋮ 菜单 fixed 定位：贴在按钮左下，夹回视口内（Teleport 到 body 后不再被 dock 压住） */
+const morePos = ref<Record<string, string>>({})
+function toggleMore() {
+  if (moreOpen.value) { closeMore(); return }
+  const r = moreBtn.value?.getBoundingClientRect()
+  if (r) {
+    const w = 170
+    morePos.value = {
+      top: Math.min(r.bottom + 6, window.innerHeight - 340) + 'px',
+      left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px',
+    }
+  }
+  moreOpen.value = true
+}
 function pick(what: 'board' | 'members' | 'tags' | 'search' | 'info' | 'disk' | 'all' | 'settings' | 'chatbg') {
   moreOpen.value = false
   moreAll.value = false
@@ -148,28 +163,31 @@ watch(() => cur.value?.id, toBottom)
     <component v-for="(sl, i) in ctx.chat?.slotsOf?.('chat-header-extra') || []" :key="'h' + i"
                :is="sl.component" v-bind="sl.props || {}" />
 
-    <!-- ⋮ 更多：看板 / 成员 / 群标签 / 记录 / 群设置 -->
+    <!-- ⋮ 更多：看板 / 成员 / 群标签 / 记录 / 群设置
+         Teleport 到 body + fixed 定位：dock 抽屉(z75)打开时菜单不再被压住 -->
     <div class="more-wrap" v-if="cur">
-      <button class="ghost small more-btn" title="更多" @click.stop="moreOpen = !moreOpen">⋮</button>
-      <div v-if="moreOpen" class="more-menu" @click.stop>
-        <button class="more-item" @click="pick('board')"><Icon name="page" :size="14" /> 看板</button>
-        <button class="more-item" v-if="cur.type === 2" @click="pick('members')"><Icon name="user" :size="14" /> 成员</button>
-        <button class="more-item" @click="pick('search')"><Icon name="search" :size="14" /> 聊天记录</button>
-        <!-- 「显示其他」：展开完整功能菜单（群文件等不用再靠特殊方法找） -->
-        <button class="more-item" @click="moreAll = !moreAll">
-          <Icon name="menu" :size="14" /> {{ moreAll ? '收起其他' : '显示其他…' }}
-          <span class="grow"></span>
-          <span class="dim small">{{ moreAll ? '▲' : '▼' }}</span>
-        </button>
-        <template v-if="moreAll">
-          <button class="more-item" v-if="cur.type === 2" @click="pick('info')"><Icon name="page" :size="14" /> 群资料</button>
-          <button class="more-item" v-if="cur.type === 2" @click="pick('disk')"><Icon name="folder" :size="14" /> 群文件</button>
-          <button class="more-item" v-if="cur.type === 2" @click="pick('tags')"><Icon name="check" :size="14" /> 群标签</button>
-          <button class="more-item" v-if="cur.type === 2" @click="pick('all')"><Icon name="search" :size="14" /> 全部看板</button>
-          <button class="more-item" @click="pick('chatbg')"><Icon name="palette" :size="14" /> 聊天背景</button>
-          <button class="more-item" @click="pick('settings')"><Icon name="settings" :size="14" /> {{ cur.type === 2 ? '群设置' : '会话设置' }}</button>
-        </template>
-      </div>
+      <button ref="moreBtn" class="ghost small more-btn" title="更多" @click.stop="toggleMore">⋮</button>
+      <Teleport to="body">
+        <div v-if="moreOpen" class="more-menu" :style="morePos" @click.stop>
+          <button class="more-item" @click="pick('board')"><Icon name="page" :size="14" /> 看板</button>
+          <button class="more-item" v-if="cur.type === 2" @click="pick('members')"><Icon name="user" :size="14" /> 成员</button>
+          <button class="more-item" @click="pick('search')"><Icon name="search" :size="14" /> 聊天记录</button>
+          <!-- 「显示其他」：展开完整功能菜单（群文件等不用再靠特殊方法找） -->
+          <button class="more-item" @click="moreAll = !moreAll">
+            <Icon name="menu" :size="14" /> {{ moreAll ? '收起其他' : '显示其他…' }}
+            <span class="grow"></span>
+            <span class="dim small">{{ moreAll ? '▲' : '▼' }}</span>
+          </button>
+          <template v-if="moreAll">
+            <button class="more-item" v-if="cur.type === 2" @click="pick('info')"><Icon name="page" :size="14" /> 群资料</button>
+            <button class="more-item" v-if="cur.type === 2" @click="pick('disk')"><Icon name="folder" :size="14" /> 群文件</button>
+            <button class="more-item" v-if="cur.type === 2" @click="pick('tags')"><Icon name="check" :size="14" /> 群标签</button>
+            <button class="more-item" v-if="cur.type === 2" @click="pick('all')"><Icon name="search" :size="14" /> 全部看板</button>
+            <button class="more-item" @click="pick('chatbg')"><Icon name="palette" :size="14" /> 聊天背景</button>
+            <button class="more-item" @click="pick('settings')"><Icon name="settings" :size="14" /> {{ cur.type === 2 ? '群设置' : '会话设置' }}</button>
+          </template>
+        </div>
+      </Teleport>
     </div>
   </header>
 
@@ -222,7 +240,8 @@ watch(() => cur.value?.id, toBottom)
   flex: 0 0 30px; border-radius: 8px;
 }
 .more-menu {
-  position: absolute; right: 0; top: 110%; z-index: 60; min-width: 148px;
+  /* Teleport 到 body：fixed 定位 + z 78（高于 dock 抽屉 75，低于对话框 80+） */
+  position: fixed; z-index: 78; min-width: 170px;
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: var(--shadow); padding: 5px;
 }

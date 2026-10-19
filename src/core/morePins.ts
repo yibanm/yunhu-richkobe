@@ -19,4 +19,15 @@ export function toggleMorePin(path: string) {
   localStorage.setItem(KEY, JSON.stringify(morePins.paths))
 }
 
+/** 拖拽排序：把 path 移到 target 之前（rail 常驻图标顺序） */
+export function moveMorePin(path: string, target: string) {
+  const from = morePins.paths.indexOf(path)
+  if (from < 0) return
+  morePins.paths.splice(from, 1)
+  let to = morePins.paths.indexOf(target)
+  if (to < 0) to = morePins.paths.length
+  morePins.paths.splice(to, 0, path)
+  localStorage.setItem(KEY, JSON.stringify(morePins.paths))
+}
+
 export function isMorePinned(path: string) { return morePins.paths.includes(path) }
