@@ -11,7 +11,7 @@
  * A2UI 的 HTML 内嵌按钮（data-a2ui-action）用事件委托在根节点上统一接。
  */
 import { ref, computed, watch, onMounted, nextTick, inject } from 'vue'
-import { resUrl } from '../core/res'
+import { resUrl, mediaUrl } from '../core/res'
 import { renderMarkdown, sanitizeHtml, postProcess, linkify, renderRich } from '../core/render'
 import { analyzeA2ui } from '../satori/a2ui'
 import type { Element } from '../satori/element'
@@ -90,7 +90,7 @@ function openRaw(src: string) {
   if (u) viewer.value = { kind: 'image', url: u }
 }
 function openVideo(src: string) {
-  const u = resUrl(src)
+  const u = mediaUrl(src, 'video')
   if (u) viewer.value = { kind: 'video', url: u }
 }
 function closeViewer() { viewer.value = null }
@@ -171,13 +171,13 @@ watch(() => props.elements, fix, { deep: true })
            @error="(e: any) => (e.target.style.display = 'none')" />
       <img v-else-if="el.type === 'sticker'" class="sticker" :src="resUrl(el.attrs.src)" loading="lazy" alt="[表情]" />
       <div v-else-if="el.type === 'video'" class="video-wrap">
-        <video class="media" :src="resUrl(el.attrs.src)" controls preload="metadata" @click="openVideo(el.attrs.src)"></video>
+        <video class="media" :src="mediaUrl(el.attrs.src, 'video')" controls preload="metadata" @click="openVideo(el.attrs.src)"></video>
         <span v-if="el.attrs.time" class="vtime">{{ el.attrs.time }}s</span>
       </div>
-      <audio v-else-if="el.type === 'audio'" :src="resUrl(el.attrs.src)" controls preload="metadata" />
+      <audio v-else-if="el.type === 'audio'" :src="mediaUrl(el.attrs.src, 'audio')" controls preload="metadata" />
 
       <!-- 文件 -->
-      <a v-else-if="el.type === 'file'" class="file" :href="resUrl(el.attrs.src)" target="_blank" rel="noreferrer"
+      <a v-else-if="el.type === 'file'" class="file" :href="mediaUrl(el.attrs.src, 'file')" target="_blank" rel="noreferrer"
          :download="el.attrs.name || undefined">
         <span class="fico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/></svg></span>
         <span class="fmeta">

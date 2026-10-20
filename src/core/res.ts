@@ -47,6 +47,20 @@ export function resUrl(u) {
 }
 
 /**
+ * 媒体资源地址：按类型补正确桶域名（裸 key 场景）。
+ * ⚠️ 视频/音频的 key 在 video1/audio1 桶，图片在 img 桶 —— 一律补 img 桶会导致播放 404。
+ */
+export function mediaUrl(u: string, kind: 'image' | 'video' | 'audio' | 'file' = 'image') {
+  if (!u || typeof u !== 'string') return u
+  if (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('/res/')) return resUrl(u)
+  const host = kind === 'video' ? 'chat-video1.jwznb.com'
+    : kind === 'audio' ? 'chat-audio1.jwznb.com'
+      : kind === 'file' ? 'chat-file.jwznb.com'
+        : 'chat-img.jwznb.com'
+  return resUrl(`https://${host}/${u.replace(/^\/+/, '')}`)
+}
+
+/**
  * 把一段已渲染 DOM 里所有资源链接改写到代理上
  * （markdown / html 消息里的 <img src> 也会被覆盖）
  */

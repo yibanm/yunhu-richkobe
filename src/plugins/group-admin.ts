@@ -307,7 +307,9 @@ export const groupAdminPlugin = {
     }
     /** 进文件夹 */
     function openFolder(item: any) {
-      state.diskPath.push({ id: state.diskFolder, name: '根目录' })
+      // 目录栈存「进入的目录」：面包屑与上传路径都从它取（旧实现 push 父级且名字写死「根目录」，
+      // 深度 ≥2 时 backFolder 会跳级）
+      state.diskPath.push({ id: item.id, name: item.name || item.fileName || '目录' })
       loadDisk(item.id)
     }
     /** 返回上一级 */

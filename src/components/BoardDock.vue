@@ -59,6 +59,38 @@ function locateFile(name: string) {
   g.locateFile?.(name)
 }
 
+/**
+ * 上传文件到群网盘当前目录：复用 server 的 WebDAV PUT 网关
+ * （user=群ID, pass=token；网关内部走七牛 + /v1/disk/upload-file）。
+ */
+const diskUploading = ref(false)
+async function uploadDisk(e: any) {
+  const fs: File[] = Array.from(e.target?.files || [])
+  e.target.value = ''
+  const gid = chat.state.current?.id
+  const token = ctx.api?.token
+  if (!gid || !token) { ctx.ui?.toast?.('未登录，无法上传', 'warn'); return }
+  diskUploading.value = true
+  let ok = 0
+  for (const f of fs) {
+    const path = [...g.state.diskPath.map((p: any) => p.name), f.name].map(encodeURIComponent).join('/')
+    try {
+      const r = await fetch(`/webdav/${gid}/${path}`, {
+        method: 'PUT',
+        headers: {
+          authorization: 'Basic ' + btoa(`${gid}:${token}`),
+          'content-type': f.type || 'application/octet-stream',
+        },
+        body: f,
+      })
+      if (r.ok || r.status === 201) ok++
+      else ctx.ui?.toast?.(`「${f.name}」上传失败：HTTP ${r.status}`, 'error')
+    } catch (err: any) { ctx.ui?.toast?.(`「${f.name}」上传失败：${err.message}`, 'error') }
+  }
+  diskUploading.value = false
+  if (ok) { ctx.ui?.toast?.(`已上传 ${ok} 个文件`, 'success'); g.loadDisk() }
+}
+
 /** 打开挂载盘（页内浏览，不跳转） */
 function openMount(m: any) {
   g.openMount(m)
@@ -239,6 +271,9 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
           <span class="grow"></span>
           <input v-model="g.state.newFolder" placeholder="新文件夹名" style="max-width:160px" />
           <button class="ghost small" @click="g.createFolder(g.state.newFolder); g.state.newFolder = ''">建文件夹</button>
+          <label class="ghost small file" title="上传到群网盘当前目录">
+            <input type="file" multiple hidden @change="uploadDisk" />上传文件
+          </label>
           <button class="ghost small" @click="g.loadDisk()">刷新</button>
         </div>
         <!-- 群里的第三方网盘挂载（比如 123云盘 WebDAV）——不在 file-list 里，要单独列 -->
