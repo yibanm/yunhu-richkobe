@@ -325,6 +325,16 @@ export const apiPlugin = {
         }))
       },
 
+      /**
+       * 邀请**机器人**进群：同端点但请求体是 JSON { chatId=机器人ID, chatType=3, groupId }
+       * （Murexide 实测；protobuf 形态只适用于普通用户，机器人会回「请求参数错误」）
+       */
+      async inviteBotToGroup(botId: string, groupId: string) {
+        return assertOk(await request('/v1/group/invite', {
+          body: { chatId: botId, chatType: 3, groupId },
+        }))
+      },
+
       /** 创建机器人：CreateBotRequest{ name=2, introduction=3, avatar_url=4, private=5 } */
       async createBot(name: string, introduction = '', avatarUrl = '', isPrivate = false) {
         const r = assertOk(await request('/v1/bot/create-bot', {
