@@ -74,6 +74,14 @@ watch(() => s.panelOpen, (v) => {
   else document.removeEventListener('paste', onPaste)
 })
 onUnmounted(() => document.removeEventListener('paste', onPaste))
+
+/** 外来表情包里的表情：右键直接加进个人收藏（url 已是云端地址，直接 expression/create） */
+async function favFromPack(e: any) {
+  const u = e.urlOriginal || e.url || ''
+  if (!u) { ctx.ui?.toast?.('这张表情没有可用地址', 'warn'); return }
+  const full = /^https?:\/\//i.test(u) ? u : `https://chat-img.jwznb.com/${String(u).replace(/^\/+/, '')}`
+  await st.addFromUrl?.(full)
+}
 </script>
 
 <template>
@@ -111,7 +119,8 @@ onUnmounted(() => document.removeEventListener('paste', onPaste))
             </button>
           </template>
           <template v-else>
-            <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送'" @click="st.send(e)">
+            <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送 · 右键添加到收藏'"
+                    @click="st.send(e)" @contextmenu.prevent="favFromPack(e)">
               <img :src="src(e)" loading="lazy" alt=""
                    @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
             </button>
