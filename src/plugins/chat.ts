@@ -627,6 +627,15 @@ export const chatPlugin = {
     function applySession(session: any, kind = 'created') {
       const msg = session.raw || {}
       const mine = session.user.id === auth.state.user?.id
+      // ⚠️ WS 推送经常只带 id/发送者不带 content（或 content 为空壳）：
+      //    直接 { ...old, ...m } 会把已加载的正文/元素抹成 {}（文章打不开的根因）。
+      //    这里做覆盖保护：incoming 空则保留本地已有值。
+      const existing = state.messages.find((x: any) => x.id === session.id)
+      const hasContent = !!msg.content && Object.keys(msg.content).length > 0
+      const content = hasContent ? msg.content : (existing?.content || {})
+      const elements = session.elements?.length
+        ? session.elements
+        : (hasContent ? parse(content, msg.type) : (existing?.elements || []))
       const m = {
         id: session.id,
         chatId: session.channel.id,
@@ -634,9 +643,9 @@ export const chatPlugin = {
         sender: session.user.name,
         avatar: session.user.avatar,
         tags: session.tags || [],
-        type: msg.type,
-        content: msg.content || {},
-        elements: session.elements,
+        type: msg.type || existing?.type,
+        content,
+        elements,
         ts: session.timestamp,
         right: mine,
         recalled: !!session.recalled,
