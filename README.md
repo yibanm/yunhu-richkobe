@@ -1,8 +1,14 @@
-# 云湖牢大版 · Vue3 + Cordis 内核 + Koishi 式控制台 + Satori 消息层
+# 云湖牢大版 · 第三方桌面客户端
+
+<p align="center"><img src="assets/brand.jpg" width="180" alt="云湖牢大版" /></p>
 
 > 本仓库 fork 自 [FLY1919/yunhu-vue](https://github.com/FLY1919/yunhu-vue)，在保留其后端代理与插件内核的基础上重制前端视觉与交互。
 > 仅供 **学习交流**。接口来自社区公开整理：
 > [yh-Tpdev/yhchatAPI](https://github.com/yh-Tpdev/yhchatAPI) 与 [yhwiki](https://codeberg.org/ybr/yhwiki)。只使用 **你自己的账号 token**。
+>
+> ⚠️ **安卓端说明**：本仓库的安卓（Capacitor WebView）方案 bug 较多、体验不佳，后续考虑砍掉。
+> 需要安卓客户端请移步两个更成熟的原生实现：
+> [Kauid323/Yhchat_md3](https://github.com/Kauid323/Yhchat_md3) 与 [murexide-project/Murexide](https://github.com/murexide-project/Murexide)。
 
 **全量 TypeScript，`npm run typecheck`(vue-tsc) 0 error。**
 
@@ -11,13 +17,11 @@
 ## 牢大版改了什么
 
 - **视觉重制**：桌面端 WinUI 3 / Fluent 观感（亚克力导航、细阴影、发丝边框），安卓端 Material 3 观感（大圆角、色调容器、涟漪反馈），运行时按平台切换（`src/platform.ts`）。
-- **QQ 式导航语义**：左栏头像=我的资料、☰ 菜单=收藏/文件/调色盘/聊天记录管理/检查更新/帮助/锁定/设置/退出账号；会话右键=分组菜单；聊天标题栏=通话/视频/投屏图标位（云湖公开接口暂无对应端点，占位提示）。
-- **输入框粘贴上传**：剪贴板里的图片/视频/音频/文件直接粘贴即上传发送。
-- **快捷回复 chips**：独立一行的强调色胶囊，与模式切换按钮明显区分，行内可增删。
+- **QQ 式导航语义**：左栏头像=我的资料、☰ 菜单=文件/调色盘/检查更新/帮助/关于/锁定/退出账号；更多功能宫格（可常驻/排序）；会话右键=置顶/免打扰/分组/删除；输入 @ 弹群成员列表。
+- **输入框粘贴上传**：剪贴板里的图片/视频/音频/文件先暂存预览（可裁剪/配文/看进度速度），确认后再发送。
+- **快捷回复 chips**：独立一行的强调色胶囊，与模式切换按钮明显区分，行内可增删、可拖拽排序。
 - **主题扩展**：壁纸与看板娘贴纸支持本地图片上传（走图床，不塞 localStorage）。
 - **品牌**：全平台图标与 README 插图为同一张牢大图（`assets/brand.jpg`）。
-
-![云湖牢大版](assets/brand.jpg)
 
 ---
 

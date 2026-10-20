@@ -110,8 +110,11 @@ async function checkUpdate() {
       return 0
     }
     if (tag && cmp(tag, cur) > 0) {
-      ui?.toast?.(`发现新版本 v${tag}：${j.name || ''}`, 'success')
-      if (j.url) window.open(j.url, '_blank')
+      // 有更新：弹窗让用户选「去 Release 更新（加速链接）」或「暂不更新」
+      const go = await ui?.confirm?.('发现新版本', `当前 v${cur}，最新 v${tag}。\n是否前往 Release 页更新？`, {
+        okText: '去 Release 更新', cancelText: '暂不更新',
+      })
+      if (go) window.open(j.urlFast || j.url, '_blank')
     } else {
       ui?.toast?.(`已是最新版本（牢大版 v${cur}）`, 'info')
     }

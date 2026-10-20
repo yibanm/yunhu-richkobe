@@ -80,12 +80,8 @@ const isFriend = computed(() => {
 const noDisturb = computed(() => {
   const id = cur.value?.id
   if (!id) return false
-  try {
-    const book = ctx.social?.state?.book
-    // 私聊查 users、群聊查 groups（云端 no-notify 两种 chatType 都支持）
-    return (book?.users || []).some((u) => u.id === id && u.noDisturb)
-      || (book?.groups || []).some((g) => g.id === id && g.noDisturb)
-  } catch { return false }
+  // 本地角标静音为准（云端 no-notify 的字段名在通讯录里不统一，只作同步不作判定）
+  return !!ctx.chat?.isMuted?.(id)
 })
 
 /** 免打扰开关（/v1/friend/no-notify + 本地角标联动） */
@@ -220,10 +216,11 @@ ctx.on('chat/open', loadAll)
 </template>
 
 <style scoped>
-.gp-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 110; display: flex; justify-content: flex-end; }
+.gp-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 82; display: grid; place-items: center; backdrop-filter: blur(3px); }
 .gp {
-  width: 420px; max-width: 94vw; background: var(--card); border-left: 1px solid var(--line);
-  display: flex; flex-direction: column; box-shadow: var(--shadow);
+  width: min(460px, 94vw); max-height: 82vh; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 18px 60px rgba(0, 0, 0, .5);
+  display: flex; flex-direction: column; overflow: hidden;
 }
 .gp > header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .gp > header .grow { flex: 1; }

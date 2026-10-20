@@ -62,10 +62,14 @@ async function resetDir() {
         </div>
       </div>
       <p class="ab-desc">
-        本仓库 fork 自上游云湖客户端，在保留其消息内核与接口能力的基础上，
-        按 QQ 的交互习惯重排了界面：会话列表、输入区暂存预览、锁屏与手机端解锁、
-        主题与壁纸自定义、插件化功能宫格。登录信息与会话缓存保存在你的文档目录，
-        换设备不丢现场。仅供学习交流。
+        <b>云湖牢大版</b>是云湖的第三方桌面客户端：保留上游消息内核与接口能力，
+        按 QQ 的交互习惯重排界面——会话列表与未读角标、输入区暂存预览（裁剪/配文/进度速度）、
+        锁屏与手机端解锁、主题壁纸自定义、插件化功能宫格与常驻排序。
+        登录信息与会话缓存保存在你的文档目录（可自定义），换设备不丢现场。仅供学习交流。
+      </p>
+      <p class="ab-desc small warn">
+        安卓端（Capacitor WebView）bug 较多、体验不佳，后续考虑砍掉；
+        需要安卓客户端请移步两个更成熟的原生实现（见下方链接）。
       </p>
       <div class="ab-links">
         <a class="ab-link" :href="UPSTREAM" target="_blank" rel="noreferrer">
@@ -74,9 +78,15 @@ async function resetDir() {
         <a class="ab-link me" :href="FORK" target="_blank" rel="noreferrer">
           <Icon name="star" :size="14" /> 本仓库 yibanm/yunhu-richkobe
         </a>
+        <a class="ab-link" href="https://github.com/Kauid323/Yhchat_md3" target="_blank" rel="noreferrer">
+          <Icon name="phone" :size="14" /> 安卓端 Yhchat_md3
+        </a>
+        <a class="ab-link" href="https://github.com/murexide-project/Murexide" target="_blank" rel="noreferrer">
+          <Icon name="phone" :size="14" /> 安卓端 Murexide
+        </a>
       </div>
       <p class="ab-star">
-        如果这个小客户端帮到了你，去本仓库点个 <b>Star</b> 吧 ⭐ ——
+        觉得好用的话，去本仓库点个 <b>Star</b> 吧 ⭐ ——
         也欢迎给原仓库一颗星，感谢上游作者的开源。
       </p>
     </div>

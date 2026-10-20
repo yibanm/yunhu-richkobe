@@ -83,6 +83,12 @@ export const messageActionsPlugin = {
       },
       { id: 'msg.select', label: '多选', icon: 'check', order: 40 },
       {
+        // 非文本消息（文件/视频/音频）：去群文件面板定位高亮（「在文件夹中打开」）
+        id: 'msg.locate', label: '在文件夹中打开', icon: 'folder', order: 45,
+        when: (p: any) => !!p?.msg && ['file', 'video', 'audio'].some((t) =>
+          (p.msg.elements || []).some((e: any) => e.type === t)),
+      },
+      {
         id: 'msg.recall', label: '撤回', icon: 'undo', order: 90, danger: true,
         // 云湖允许管理员撤回他人消息，这里不再限制只有自己的；服务端会校验权限
         when: (p: any) => !!p?.msg && !p?.msg?.recalled,
@@ -106,6 +112,19 @@ export const messageActionsPlugin = {
     /** 编辑自己的文本消息：打开编辑对话框（QQ 式轻量交互，无弹窗确认） */
     chat.action('msg.edit', {
       action: ({ msg }: any) => { state.editingId = msg.id },
+    }, ctx)
+
+    /** 在文件夹中打开：非文本消息 → 群文件面板定位高亮 */
+    chat.action('msg.locate', {
+      action: ({ msg }: any) => {
+        const el = (msg.elements || []).find((e: any) => ['file', 'video', 'audio'].includes(e.type))
+        if (!el) return
+        const name = el.attrs?.name || String(el.attrs?.src || '').split('/').pop() || ''
+        const g = (ctx as any).group
+        if (!g) return ui.toast('群文件面板不可用', 'warn')
+        g.setDockTab('disk')
+        g.locateFile?.(name)
+      },
     }, ctx)
 
     chat.action('msg.forward', { action: ({ msg }: any) => service.openForward([msg.id]) }, ctx)

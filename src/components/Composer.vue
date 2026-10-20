@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, ref, nextTick, computed, onUnmounted } from 'vue'
+import { inject, ref, nextTick, computed, onUnmounted, watch } from 'vue'
 import QuoteBar from './QuoteBar.vue'
 import ImageEditor from './ImageEditor.vue'
 import { h } from '../satori/element'
@@ -113,7 +113,9 @@ function autoresize() {
   el.style.height = el.scrollHeight + 'px'
 }
 
-/* ---------------- 待发送附件（暂存预览，不直接发送） ---------------- */
+/* ---------------- 待发送附件（暂存预览，不直接发送） ----------------
+ * 暂存区按会话 id 存模块级 Map：切会话/组件重挂载都不丢（之前重挂载即清空，要重新上传）。
+ */
 interface Pending {
   id: number
   file: File
@@ -125,8 +127,14 @@ interface Pending {
   progress: number
   speed: number
 }
+const stagedByConv = new Map<string, Pending[]>()
 const pending = ref<Pending[]>([])
 let pendingSeq = 0
+const convId = computed(() => chat.state.current?.id || '')
+watch(convId, (id, oldId) => {
+  if (oldId) stagedByConv.set(oldId, pending.value)
+  pending.value = stagedByConv.get(id) || []
+}, { immediate: true })
 
 function classify(f: File): Pending['kind'] {
   if (f.type.startsWith('image/')) return 'image'
@@ -140,10 +148,12 @@ function stage(f: File) {
   const k = classify(f)
   const url = (k === 'image' || k === 'video') ? URL.createObjectURL(f) : ''
   pending.value.push({ id: ++pendingSeq, file: f, url, kind: k, caption: '', error: '', progress: 0, speed: 0 })
+  if (convId.value) stagedByConv.set(convId.value, pending.value)
 }
 
 function unstage(p: Pending) {
   pending.value = pending.value.filter((x) => x.id !== p.id)
+  if (convId.value) stagedByConv.set(convId.value, pending.value)
   if (p.url) URL.revokeObjectURL(p.url)
 }
 
@@ -244,11 +254,12 @@ async function submit() {
           await chat.sendMedia([h.image(url)])
           if (p.caption.trim()) await chat.send(p.caption.trim(), 1)
         } else if (p.kind === 'video') {
-          const { url } = await ctx.api.uploadAndUrl(p.file, 'video', onProg)
-          await chat.sendMedia([h.video(url, 0)])
+          // 视频/音频发**裸 key**（与 stickers.sendVideo 同协议）：发完整 URL 云端存不下、播放 404
+          const { key } = await ctx.api.uploadFile(p.file, 'video', onProg)
+          await chat.sendMedia([h.video(key, 0)])
         } else if (p.kind === 'audio') {
-          const { url } = await ctx.api.uploadAndUrl(p.file, 'audio', onProg)
-          await chat.sendMedia([h.audio(url, 0)])
+          const { key } = await ctx.api.uploadFile(p.file, 'audio', onProg)
+          await chat.sendMedia([h.audio(key, 0)])
         } else {
           const { url } = await ctx.api.uploadAndUrl(p.file, 'file', onProg)
           await chat.sendMedia([h.file(url, p.file.name, p.file.size)])
@@ -273,6 +284,28 @@ async function submit() {
     uploading.value = false
     if (attachFailed) ctx.ui?.toast(`${attachFailed} 个附件发送失败，已保留在待发送区，可重试`, 'error')
   }
+}
+
+/* ---- 输入区高度拖拽（顶边把手）：最低一行字高，双击复位 ---- */
+const taMinH = 24   // 一行字的高度（px）
+function startResize(e: MouseEvent) {
+  const startY = e.clientY
+  const el = ta.value
+  const startH = el ? el.getBoundingClientRect().height : 140
+  const move = (ev: MouseEvent) => {
+    const h = Math.max(taMinH, Math.min(startH + (startY - ev.clientY), window.innerHeight * 0.7))
+    if (el) el.style.height = h + 'px'
+  }
+  const up = () => {
+    window.removeEventListener('mousemove', move)
+    window.removeEventListener('mouseup', up)
+  }
+  window.addEventListener('mousemove', move)
+  window.addEventListener('mouseup', up)
+}
+function resetHeight() {
+  const el = ta.value
+  if (el) { el.style.height = ''; autoresize() }
 }
 
 function onKey(e: KeyboardEvent) {
@@ -347,6 +380,9 @@ function fmtSize(n: number) {
 <template>
   <div class="composer" :class="{ 'drag-over': dragOver }"
        @drop="onDrop" @dragover.prevent="dragOver = true" @dragleave="dragOver = false">
+    <!-- 顶边拖拽调输入区高度（最低=一行字高，双击复位） -->
+    <div class="resize-bar" title="拖拽调整输入区高度（双击复位）"
+         @mousedown.prevent="startResize" @dblclick="resetHeight"></div>
     <QuoteBar />
     <div class="bar-row">
       <template v-for="it in barItems" :key="it.id">
@@ -455,6 +491,13 @@ function fmtSize(n: number) {
 .send-row .hint { font-size: 11px; color: var(--fg2); }
 .send-row button { height: 28px; padding: 0 18px; font-size: 13px; border-radius: 6px; }
 .rec-dot { font-size: 12px; color: var(--err); flex: 0 0 auto; }
+
+/* 顶边拖拽把手：一条细热区，hover 变强调色提示可拖 */
+.resize-bar {
+  position: absolute; left: 0; right: 0; top: -4px; height: 8px; cursor: ns-resize;
+  background: transparent; z-index: 2;
+}
+.resize-bar:hover, .resize-bar:active { background: color-mix(in srgb, var(--acc) 35%, transparent); }
 
 /* @成员下拉（浮在输入区上方） */
 .at-pop {

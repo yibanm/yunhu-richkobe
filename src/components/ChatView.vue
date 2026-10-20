@@ -101,10 +101,13 @@ function toBottom() { nextTick(() => { if (box.value) box.value.scrollTop = box.
 
 /** 滚动时上报「是否贴底」：新消息/轮询刷新只在贴底时自动滚，翻历史不被打断 */
 let loadingTop = false
+const showJump = ref(false)   // 离开底部时显示「回最新」箭头
 function onScroll() {
   const el = box.value
   if (!el) return
-  ctx.chat?.setAtBottom?.(el.scrollHeight - el.scrollTop - el.clientHeight < 40)
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+  ctx.chat?.setAtBottom?.(atBottom)
+  showJump.value = !atBottom
   // 历史消息自动加载：滚到顶部即拉上一页（QQ 式，不再需要点按钮），并保持阅读位置
   if (el.scrollTop < 40 && chat.state.hasMore && !chat.state.loadingMore && !loadingTop) {
     loadingTop = true
@@ -152,8 +155,9 @@ watch(() => cur.value?.id, toBottom)
       </div>
     </div>
     <div class="head-side" v-if="ctx.ws && ctx.ws.state.status !== 'online'">
-      <span class="dot wait"></span>
-      <button class="ghost small" @click="ctx.ws.reconnect()">重连</button>
+      <!-- 重连中只给一个小黄点 + 悬浮提示，不再占按钮位刷屏（点击可手动重连） -->
+      <span class="dot wait" :title="'连接状态：' + ctx.ws.state.status + '（点击重连）'"
+            style="cursor:pointer" @click="ctx.ws.reconnect()"></span>
     </div>
 
     <!-- 云湖公开接口没有通话/投屏端点 —— 按「无后端即砍」原则不放占位按钮 -->
@@ -193,6 +197,10 @@ watch(() => cur.value?.id, toBottom)
   </div>
 
   <div v-else ref="box" class="messages" @click="closeMenu(); closeMore()" @scroll="onScroll">
+    <!-- 往上翻后右下角出现「回最新」箭头（QQ 式） -->
+    <button v-if="showJump" class="jump-latest" title="回到最新" @click="toBottom()">
+      <Icon name="down" :size="16" />
+    </button>
     <div v-if="chat.state.hasMore && chat.state.loadingMore" class="load-more">
       <span class="sys">加载历史中…</span>
     </div>

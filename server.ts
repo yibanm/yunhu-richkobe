@@ -258,26 +258,53 @@ async function handleData(req: http.IncomingMessage, res: http.ServerResponse, n
 
 /** GET /update-check —— 代理 GitHub Releases 最新版本（检查更新用，避免前端直连被墙/CORS） */
 async function handleUpdateCheck(res: http.ServerResponse): Promise<void> {
-  const url = process.env.UPDATE_URL || 'https://api.github.com/repos/yibanm/yunhu-richkobe/releases/latest'
-  const r = await new Promise<{ status: number; body: string }>((resolve) => {
-    const req = https.get(url, { headers: { 'user-agent': 'yunhu-client', accept: 'application/vnd.github+json' } }, up => {
-      const chunks: Buffer[] = []
-      up.on('data', c => chunks.push(c))
-      up.on('end', () => resolve({ status: up.statusCode || 502, body: Buffer.concat(chunks).toString('utf8') }))
+  // GitHub API 直连在国内不稳：依次试直连 → 加速镜像
+  const bases = [
+    'https://api.github.com',
+    'https://ghfast.top/https://api.github.com',
+    'https://ghproxy.net/https://api.github.com',
+  ]
+  const path = '/repos/yibanm/yunhu-richkobe/releases'
+  let payload = ''
+  let okStatus = 0
+  for (const base of bases) {
+    const r = await new Promise<{ status: number; body: string }>((resolve) => {
+      const req = https.get(base + path, { headers: { 'user-agent': 'yunhu-client', accept: 'application/vnd.github+json' } }, up => {
+        const chunks: Buffer[] = []
+        up.on('data', c => chunks.push(c))
+        up.on('end', () => resolve({ status: up.statusCode || 502, body: Buffer.concat(chunks).toString('utf8') }))
+      })
+      req.on('error', e => resolve({ status: 502, body: JSON.stringify({ message: e.message }) }))
+      req.setTimeout(8000, () => { req.destroy(); resolve({ status: 504, body: '{"message":"timeout"}' }) })
     })
-    req.on('error', e => resolve({ status: 502, body: JSON.stringify({ message: e.message }) }))
-    req.setTimeout(8000, () => { req.destroy(); resolve({ status: 504, body: '{"message":"timeout"}' }) })
-  })
-  if (r.status !== 200) { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: `github ${r.status}` })); return }
+    if (r.status === 200) { okStatus = 200; payload = r.body; break }
+  }
+  if (okStatus !== 200) { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'github 不可达（直连与镜像均失败）' })); return }
   try {
-    const j = JSON.parse(r.body)
+    // 取版本号最高的 v-tag release（desktop-latest 等非版本 tag 不参与比较）
+    const list = JSON.parse(payload) as any[]
+    const ver = (t: string) => t.replace(/^v/, '').split('.').map(Number)
+    const cands = list.filter((x: any) => /^v?\d+\.\d+\.\d+$/.test(x.tag_name || ''))
+    if (!cands.length) { res.writeHead(200, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'no versioned release' })); return }
+    cands.sort((a: any, b: any) => {
+      const pa = ver(a.tag_name), pb = ver(b.tag_name)
+      for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0)
+      return 0
+    })
+    const j = cands[0]
+    const direct = j.html_url || ''
     res.writeHead(200, JSON_HDR).end(JSON.stringify({
       ok: true,
       tag: j.tag_name || '',
       name: j.name || j.tag_name || '',
       notes: j.body || '',
-      url: j.html_url || '',
-      assets: (j.assets || []).map((a: any) => ({ name: a.name, url: a.browser_download_url, size: a.size })),
+      url: direct,
+      urlFast: direct ? `https://ghfast.top/${direct}` : '',
+      assets: (j.assets || []).map((a: any) => ({
+        name: a.name, url: a.browser_download_url,
+        urlFast: a.browser_download_url ? `https://ghfast.top/${a.browser_download_url}` : '',
+        size: a.size,
+      })),
     }))
   } catch { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'bad github payload' })) }
 }

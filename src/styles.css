@@ -340,6 +340,14 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .only-mobile { display: none; }
 
 .messages { flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; position: relative; isolation: isolate; }
+/* 「回最新」悬浮箭头：离开底部时出现在消息区右下角 */
+.jump-latest {
+  position: sticky; top: calc(100% - 56px); align-self: flex-end; margin-right: 6px;
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg2); display: grid; place-items: center;
+  cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); z-index: 5;
+}
+.jump-latest:hover { color: var(--acc); border-color: var(--acc); }
 .messages::before {
   content: ''; position: absolute; inset: -24px; z-index: -1;
   background-image: var(--wallpaper, none);
@@ -560,7 +568,8 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .qr-add-input { width: 120px; padding: 4px 10px; font-size: 12.5px; border-radius: 999px; }
 
 /* 聊天标题栏 QQ 式图标按钮 */
-.icon-btn { width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center; }
+/* 图标按钮零内边距 + grid 居中；特异性要压过 button.small/button.tiny 的 padding */
+button.icon-btn { width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center; }
 .ctx-menu .rm-item.on { background: var(--acc-soft); color: var(--acc); }
 
 /* ===================================================================
