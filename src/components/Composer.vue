@@ -160,6 +160,15 @@ function unstage(p: Pending) {
 /** 组件卸载释放全部 objectURL（之前漏了这条路径，切会话即泄漏） */
 onUnmounted(() => { for (const p of pending.value) if (p.url) URL.revokeObjectURL(p.url) })
 
+/* 登出清空暂存（Map 是模块级，跨账号会残留上一账号的附件）；
+   Composer 按会话挂载，监听器必须挂载/卸载配对，否则累积 */
+const offLogout = ctx.on('auth/logout', () => {
+  for (const list of stagedByConv.values()) for (const p of list) if (p.url) URL.revokeObjectURL(p.url)
+  stagedByConv.clear()
+  pending.value = []
+})
+onUnmounted(offLogout)
+
 /** 选择框支持多选：全部进暂存区 */
 async function onPick(e: any) {
   const fs: File[] = Array.from(e.target?.files || [])

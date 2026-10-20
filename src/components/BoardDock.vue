@@ -50,7 +50,9 @@ function mountFileUrl(name: string) {
   const gid = chat.state.current?.id
   const mid = g.state.mountView?.id
   const p = [...g.state.mountPath, name].map(encodeURIComponent).join('/')
-  return `${location.origin}/webdav/${gid}/@mount/${mid}/${p}`
+  // 新标签页没有 Basic 认证上下文 → 带 token query（网关支持），否则 401「打不开」
+  const token = ctx.api?.token || ''
+  return `${location.origin}/webdav/${gid}/@mount/${mid}/${p}?token=${encodeURIComponent(token)}`
 }
 
 /** 定位文件：挂载盘视图内高亮当前列表；否则跳群文件面板高亮 */
