@@ -18,7 +18,7 @@ function answer(ok: boolean) {
 </script>
 
 <template>
-  <div v-if="req" class="cf-mask">
+  <div v-if="req" class="cf-mask" @click.self="answer(false)">
     <div class="cf-box">
       <div class="cf-title">{{ req.title }}</div>
       <div v-if="req.message" class="cf-msg">{{ req.message }}</div>
