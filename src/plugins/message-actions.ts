@@ -69,7 +69,7 @@ export const messageActionsPlugin = {
       { id: 'msg.copy', label: '复制文本', icon: 'copy', order: 30 },
       {
         // 图片/表情消息右键收藏：表情直接收藏，图片转成表情收藏（云湖 /v1/expression/create）
-        id: 'msg.fav', label: '收藏表情', icon: 'star', order: 35,
+        id: 'msg.fav', label: '添加到收藏', icon: 'star', order: 35,
         when: (p: any) => !!(p?.msg?.elements || []).some((e: any) => e.type === 'img' || e.type === 'sticker'),
       },
       {

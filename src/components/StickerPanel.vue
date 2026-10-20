@@ -7,7 +7,7 @@
  * 过滤：url 为空或 CDN 上已不存在的 .tmp 条目直接不显示（否则一片裂图）。
  * 收藏/置顶/删除：expression/create、expression/topping、expression/delete。
  */
-import { inject, computed, ref, watch } from 'vue'
+import { inject, computed, ref, watch, onUnmounted } from 'vue'
 import { resUrl } from '../core/res'
 
 const ctx = inject<any>('ctx')
@@ -47,6 +47,33 @@ function src(e: any) {
   const u = e.urlOriginal || e.url || ''
   return resUrl(u)
 }
+
+/** 上传到「当前选中的页签」：收藏 or 某个表情包组 */
+async function onPickUpload(e: any) {
+  const fs: File[] = Array.from(e.target?.files || [])
+  e.target.value = ''
+  for (const f of fs) await st.addFileToTarget(f, tab.value)
+}
+
+/** 面板打开时支持直接 Ctrl+V 粘贴图片进当前页签（document 级，不依赖焦点） */
+function onPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  let took = false
+  for (const it of Array.from(items)) {
+    if (it.kind !== 'file') continue
+    const f = it.getAsFile()
+    if (!f || !f.type.startsWith('image/')) continue
+    took = true
+    st.addFileToTarget(f, tab.value)
+  }
+  if (took) e.preventDefault()
+}
+watch(() => s.panelOpen, (v) => {
+  if (v) document.addEventListener('paste', onPaste)
+  else document.removeEventListener('paste', onPaste)
+})
+onUnmounted(() => document.removeEventListener('paste', onPaste))
 </script>
 
 <template>
@@ -58,7 +85,7 @@ function src(e: any) {
         <span class="grow"></span>
         <input v-model="s.keyword" placeholder="搜索…" style="max-width: 130px" />
         <label class="ghost small file">
-          <input type="file" accept="image/*" hidden @change="(e: any) => st.uploadAndAdd(e)" />上传并收藏
+          <input type="file" accept="image/*" multiple hidden @change="onPickUpload" />上传到当前栏
         </label>
         <button class="ghost small" @click="st.load()">刷新</button>
         <button class="sp-x" @click="st.close()">×</button>
@@ -91,10 +118,10 @@ function src(e: any) {
           </template>
         </div>
         <p v-if="tab === 'fav' && !list.length" class="dim center">
-          {{ s.loading ? '加载中…' : '还没有收藏。可以用「上传并收藏」加一张，或在消息图片上右键收藏。' }}
+          {{ s.loading ? '加载中…' : '还没有收藏。点「上传到当前栏」或直接 Ctrl+V 粘贴图片，也可在消息图片上右键「添加到收藏」。' }}
         </p>
         <p v-if="tab !== 'fav' && !packItems.length" class="dim center">
-          {{ s.packsLoading ? '加载中…' : '这个表情包是空的' }}
+          {{ s.packsLoading ? '加载中…' : '这个表情包是空的 —— 点「上传到当前栏」或 Ctrl+V 粘贴图片加入' }}
         </p>
       </div>
     </div>

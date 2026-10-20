@@ -57,14 +57,16 @@ export const stickersPlugin = {
 
     /* ---------------- 表情收藏 ---------------- */
 
-    async function load() {
+    async function load(silent = false) {
       state.loading = true
       try { state.list = await api.expressionList() }
-      catch (e: any) { ui.toast('表情收藏加载失败：' + e.message, 'error') }
+      catch (e: any) { if (!silent) ui.toast('表情收藏加载失败：' + e.message, 'error') }
       finally { state.loading = false }
     }
 
-    function open() { state.panelOpen = true; if (!state.list.length) load() }
+    // 每次打开都后台静默刷新：云端可能在别的端加了收藏
+    // （旧实现 `if (!state.list.length) load()` 只空时拉一次，之后永远 stale）
+    function open() { state.panelOpen = true; load(state.list.length > 0) }
     function close() { state.panelOpen = false }
 
     /** 点一张表情 → 作为表情消息发出 */
@@ -79,17 +81,37 @@ export const stickersPlugin = {
     async function uploadAndAdd(ev: any) {
       const f = ev?.target?.files?.[0]
       if (!f) return
+      await addFileToTarget(f, 'fav')
+      ev.target.value = ''
+    }
+
+    /**
+     * 上传到指定目标：'fav' = 个人收藏；数字 = 表情包组 id。
+     * 面板里「选到哪一栏就传哪一栏」+ 粘贴上传都走这里。
+     */
+    async function addFileToTarget(f: File, target: 'fav' | number) {
       try {
         const res: any = await api.uploadFile(f, 'image')
         const key = typeof res === 'string' ? res : res?.key
         if (!key) throw new Error('上传没拿到 key')
-        // ⚠️ /v1/expression/create 要的是**完整图片 URL**（不是裸 key）
+        // ⚠️ 收藏/表情包接口要的都是**完整图片 URL**（不是裸 key）
         const url = res?.url || `https://chat-img.jwznb.com/${key}`
-        await api.expressionCreate(url)
-        ui.toast('已加入表情收藏', 'success')
+        if (target === 'fav') await api.expressionCreate(url)
+        else await api.stickerAddSticker(target as number, f.name.replace(/\.\w+$/, '') || 'sticker', url)
+        ui.toast(target === 'fav' ? '已加入表情收藏' : '已加入表情包', 'success')
         await load()
+        if (target !== 'fav') await loadPacks()
       } catch (e: any) { ui.toast('收藏失败：' + e.message, 'error') }
-      ev.target.value = ''
+    }
+
+    /** 把一张已在云端的图（消息里的 url/key）加进表情包组 */
+    async function addUrlToPack(url: string, packId: number, name: string) {
+      const full = /^https?:\/\//i.test(url) ? url : `https://chat-img.jwznb.com/${String(url).replace(/^\/+/, '')}`
+      try {
+        await api.stickerAddSticker(packId, name, full)
+        ui.toast('已加入表情包', 'success')
+        await loadPacks()
+      } catch (e: any) { ui.toast('加入失败：' + e.message, 'error') }
     }
 
     /** 置顶一张收藏表情 */
@@ -275,6 +297,7 @@ export const stickersPlugin = {
 
     const service = {
       state, load, open, close, send, uploadAndAdd, remove, topping, addFromUrl,
+      addFileToTarget, addUrlToPack,
       loadPacks, createPack, renamePack, deletePack, removePack,
       recordStart, recordStop, sendAudioFile,
       sendVideo, sendVideoFile, recordVideoStart, recordVideoStop,
