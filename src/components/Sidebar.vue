@@ -64,6 +64,21 @@ function toggleMute() {
   if (menu.conv) chat.toggleMute(menu.conv.id)
   closeMenu()
 }
+/** 复制群号/会话 ID（QQ 式右键项） */
+async function copyId() {
+  const c = menu.conv
+  closeMenu()
+  if (!c) return
+  try { await navigator.clipboard.writeText(String(c.id)); ctx.ui?.toast?.('已复制 ' + c.id, 'success') }
+  catch { ctx.ui?.toast?.('复制失败（浏览器拒绝剪贴板）', 'error') }
+}
+/** 标记未读（本地持久角标，打开会话时清除） */
+function markUnread() {
+  const c = menu.conv
+  closeMenu()
+  if (!c) return
+  chat.markUnread(c.id)
+}
 /** 删除会话（本地隐藏，不删云端记录；二次确认防误触） */
 async function delConv() {
   const c = menu.conv
@@ -228,6 +243,8 @@ async function dlgOk() {
           <Icon :name="chat.isMuted(menu.conv?.id) ? 'bellOn' : 'bellOff'" :size="14" />
           {{ chat.isMuted(menu.conv?.id) ? '取消免打扰' : '免打扰' }}
         </button>
+        <button class="rm-item" @click="copyId"><Icon name="copy" :size="14" /> 复制群号/ID</button>
+        <button class="rm-item" @click="markUnread"><Icon name="chat" :size="14" /> 标记未读</button>
         <div class="rm-sep"></div>
         <div class="rm-item dim small" style="cursor:default">移动到分组</div>
         <button v-if="chat.groupOf(menu.conv?.id)" class="rm-item" @click="assignTo('')"><Icon name="undo" :size="14" /> 移出分组</button>

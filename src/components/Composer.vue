@@ -77,6 +77,11 @@ ctx.on('commands/pick', (t: string) => {
   text.value = t
   nextTick(() => { autoresize(); ta.value?.focus() })
 })
+/* 群面板「@ TA」等外部追加文本到输入框 */
+ctx.on('composer/append', (t: string) => {
+  text.value += t
+  nextTick(() => { autoresize(); ta.value?.focus() })
+})
 
 function onBar(it: any) {
   if (it.kind === 'type') { kind.value = it.value; return }

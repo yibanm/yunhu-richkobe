@@ -133,6 +133,7 @@ export const chatPlugin = {
       pinned: JSON.parse(localStorage.getItem('yunhu.conv.pinned') || '[]') as string[],
       hidden: JSON.parse(localStorage.getItem('yunhu.conv.hidden') || '[]') as string[],
       muted: JSON.parse(localStorage.getItem('yunhu.conv.muted') || '[]') as string[],
+      marked: JSON.parse(localStorage.getItem('yunhu.conv.markunread') || '[]') as string[],
       editing: false,
     })
     function saveGroups() {
@@ -142,6 +143,14 @@ export const chatPlugin = {
       localStorage.setItem('yunhu.conv.pinned', JSON.stringify(convGroups.pinned))
       localStorage.setItem('yunhu.conv.hidden', JSON.stringify(convGroups.hidden))
       localStorage.setItem('yunhu.conv.muted', JSON.stringify(convGroups.muted))
+      localStorage.setItem('yunhu.conv.markunread', JSON.stringify(convGroups.marked))
+    }
+    /** 标记未读（本地角标，打开会话时清除） */
+    function markUnread(convId: string) {
+      if (!convGroups.marked.includes(convId)) convGroups.marked.push(convId)
+      saveGroups()
+      const c = state.conversations.find((x: any) => x.id === convId)
+      if (c) c.unread = Math.max(c.unread || 0, 1)
     }
     /** 免打扰（本地）：该会话不计入总未读、侧栏不显示红点（消息照收） */
     function toggleMute(convId: string) {
@@ -187,7 +196,7 @@ export const chatPlugin = {
         saveGroups()
       },
       isCollapsed(id: string) { return convGroups.collapsed.includes(id) },
-      toggleMute, isMuted,
+      toggleMute, isMuted, markUnread,
       /** 置顶（本地排序，云湖无置顶接口） */
       togglePin(convId: string) {
         const i = convGroups.pinned.indexOf(convId)
@@ -347,6 +356,10 @@ export const chatPlugin = {
           }
         }
         state.conversations = sorted
+        // 本地「标记未读」的会话：轮询不冲掉角标（打开后清除）
+        for (const c of sorted) {
+          if (convGroups.marked.includes(c.id) && state.current?.id !== c.id) c.unread = Math.max(c.unread || 0, 1)
+        }
         saveSnapshot(sorted)
       } catch (e: any) {
         if (!silent) ctx.emit('ui/toast', { text: '会话列表加载失败：' + e.message, 'type': 'error' })
@@ -442,6 +455,11 @@ export const chatPlugin = {
 
     async function open(chat: any) {
       state.current = chat
+      // 打开即清除本地「标记未读」
+      if (convGroups.marked.includes(chat.id)) {
+        convGroups.marked = convGroups.marked.filter((x: string) => x !== chat.id)
+        saveGroups()
+      }
       // E6：先归零再加载，避免总角标在 await 窗口内多计
       const hit0 = state.conversations.find((c: any) => c.id === chat.id)
       if (hit0) { hit0.unread = 0; hit0.at = false }

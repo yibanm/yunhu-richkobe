@@ -234,6 +234,9 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .chat-page { display: flex; height: 100%; min-height: 0; position: relative; }
 .chat-side { width: 292px; flex: 0 0 292px; border-right: 1px solid var(--line); background: var(--card); min-height: 0; }
 .chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* 群设置面板打开时聊天区让位（QQ 式挤压，不遮盖） */
+.chat-page.gp-open .chat-main { margin-right: 340px; }
+@media (max-width: 900px) { .chat-page.gp-open .chat-main { margin-right: 0; } }
 
 .sidebar { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; z-index: 60; }
 .me { padding: 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }

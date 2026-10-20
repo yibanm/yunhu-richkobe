@@ -10,7 +10,7 @@ const ctx = inject<any>('ctx')
 </script>
 
 <template>
-  <div class="chat-page" :class="{ 'drawer-open': drawer }">
+  <div class="chat-page" :class="{ 'drawer-open': drawer, 'gp-open': ctx?.group?.state?.panelOpen }">
     <aside class="chat-side">
       <Sidebar />
     </aside>

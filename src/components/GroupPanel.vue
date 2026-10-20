@@ -1,14 +1,11 @@
 <script setup lang="ts">
 /**
- * 会话设置抽屉（聊天右上角 ⋮ → 群设置 / 会话设置）。
- *
- * 两种形态：
- *   · 群聊：我在本群的昵称、群内消息类型限制
- *   · 私聊：对方资料、免打扰开关、加好友 / 删好友（**不能**再显示群功能）
- * 判断依据是 chat.state.current.type === 2（群聊）。
- *
- * ⚠️ 这个文件曾经因为模板里用了 resUrl/fallbackAvatar 但没 import，
- *    整个抽屉渲染成空注释、控制台还不报错 —— 靠 scripts/preflight.mjs 才查出来。
+ * 会话/群设置面板（QQ 式右侧固定面板，非弹窗、不遮聊天区）。
+ * 群聊：群卡片 + 成员宫格(邀请/查看全部) + 群公告 + 我的本群昵称 + 群聊备注(本地)
+ *       + 设为置顶/消息免打扰开关 + 退出群聊。
+ * 私聊：对方资料 + 免打扰 + 加好友/删好友。
+ * 成员右键菜单（QQ 式，只保留有后端的项）：发消息 / @ TA / 查看资料 / 添加好友 / 禁言TA。
+ * （戳一戳/举报云湖无接口，按「无后端即砍」不做。）
  */
 import { inject, ref, computed, onMounted, watch } from 'vue'
 import { resUrl } from '../core/res'
@@ -18,222 +15,246 @@ import Icon from '../console/components/Icon.vue'
 const ctx = inject<any>('ctx')
 const g = ctx.group
 const chat = ctx.chat
-const ui = ctx.ui
-const api = ctx.api
-
-/** 群内可限制的消息类型（对齐 /v1/group/msg-type-limit） */
-const MSG_TYPES = [
-  { v: 1, n: '文本' }, { v: 2, n: '图片' }, { v: 3, n: 'Markdown' }, { v: 4, n: '文件' },
-  { v: 6, n: '帖子' }, { v: 7, n: '表情' }, { v: 8, n: 'HTML' }, { v: 10, n: '视频' },
-  { v: 11, n: '语音' }, { v: 13, n: '语音通话' },
-]
-
-const nick = ref('')
-const limit = ref<number[]>([])
-const busy = ref(false)
-const info = computed(() => g.state.info)
+const auth = ctx.auth
 
 const isOpen = computed(() => g.state.panelOpen)
 const cur = computed(() => chat.state.current)
+const isGroup = computed(() => cur.value?.type === 2)
+const info = computed(() => g.state.info)
+const members = computed(() => (g.state.members || []).slice(0, 14))
 
-function toggleLimit(v: number) {
-  const i = limit.value.indexOf(v)
-  if (i >= 0) limit.value.splice(i, 1)
-  else limit.value.push(v)
-}
-
-async function loadAll() {
-  const gid = cur.value?.id
-  if (!gid || cur.value?.type !== 2) return
-  try { g.state.info = await api.groupInfo(gid) } catch { /* 忽略 */ }
-}
+/* 我的本群昵称 / 群聊备注 */
+const nick = ref('')
+const remark = ref('')
+const busy = ref(false)
+watch([isOpen, cur], async () => {
+  if (!isOpen.value || !cur.value) return
+  nick.value = info.value?.myGroupNickname || ''
+  remark.value = localStorage.getItem('yh.remark.' + cur.value.id) || ''
+  if (isGroup.value && !g.state.members.length) g.loadMembers()
+}, { immediate: true })
 
 async function saveNick() {
-  const gid = cur.value?.id
-  if (!gid) return
+  if (busy.value || !cur.value) return
   busy.value = true
   try {
-    await api.setMyGroupNickname(gid, nick.value.trim())
-    ui.toast('群昵称已更新', 'success')
-  } catch (e: any) { ui.toast('失败：' + e.message, 'error') }
+    await ctx.api.setMyGroupNickname(cur.value.id, nick.value)
+    ctx.ui?.toast?.('昵称已保存', 'success')
+  } catch (e: any) { ctx.ui?.toast?.('保存失败：' + e.message, 'error') }
   finally { busy.value = false }
 }
-
-async function saveLimit() {
-  const gid = cur.value?.id
-  if (!gid) return
-  busy.value = true
-  try {
-    await api.setMsgTypeLimit(gid, limit.value.join(','))
-    ui.toast('消息类型限制已保存', 'success')
-  } catch (e: any) { ui.toast('失败：' + e.message, 'error') }
-  finally { busy.value = false }
+function saveRemark() {
+  if (!cur.value) return
+  localStorage.setItem('yh.remark.' + cur.value.id, remark.value)
+  ctx.ui?.toast?.('备注已保存（本地）', 'success')
 }
 
-/* ---------------- 私聊分支用的状态 ---------------- */
-const isGroup = computed(() => cur.value?.type === 2)
-const isFriend = computed(() => {
-  const id = cur.value?.id
-  if (!id) return false
-  try { return (ctx.group?.isFriend?.(id) ?? false) } catch { return false }
+/* 置顶 / 免打扰开关（本地，与右键菜单联动） */
+const pinned = computed(() => !!cur.value && chat.isPinned(cur.value.id))
+const muted = computed(() => !!cur.value && chat.isMuted(cur.value.id))
+function togglePin() { if (cur.value) chat.togglePin(cur.value.id) }
+async function toggleMute() {
+  if (!cur.value) return
+  const next = !muted.value
+  chat.toggleMute(cur.value.id)
+  // 云端同步（失败不阻塞本地）
+  try { await ctx.api?.noNotify?.(cur.value.id, cur.value.type || 1, next) } catch { /* 本地已生效 */ }
+}
+
+/* 成员右键菜单（QQ 式） */
+const mm = ref<{ open: boolean; x: number; y: number; m: any }>({ open: false, x: 0, y: 0, m: null })
+function openMemberMenu(m: any, e: MouseEvent) {
+  mm.value = { open: true, x: Math.min(e.clientX, window.innerWidth - 170), y: Math.min(e.clientY, window.innerHeight - 240), m }
+}
+function closeMM() { mm.value.open = false }
+watch(() => mm.value.open, (v) => {
+  const off = () => closeMM()
+  if (v) setTimeout(() => document.addEventListener('click', off), 0)
+  else document.removeEventListener('click', off)
 })
-const noDisturb = computed(() => {
-  const id = cur.value?.id
-  if (!id) return false
-  // 本地角标静音为准（云端 no-notify 的字段名在通讯录里不统一，只作同步不作判定）
-  return !!ctx.chat?.isMuted?.(id)
-})
-
-/** 免打扰开关（/v1/friend/no-notify + 本地角标联动） */
-async function toggleNoDisturb() {
-  const id = cur.value?.id
-  if (!id) return
-  const next = !noDisturb.value
-  try {
-    await ctx.api.noNotify(id, cur.value.type || 1, next)
-    ctx.ui.toast(next ? '已开启免打扰' : '已关闭免打扰', 'success')
-    await ctx.social?.loadBook?.()
-  } catch (e) { ctx.ui.toast('云端设置失败：' + e.message, 'error') }
-  // 本地角标同步（无论云端成败，本地体验一致）
-  if (ctx.chat?.isMuted?.(id) !== next) ctx.chat?.toggleMute?.(id)
+function mmSend() { const m = mm.value.m; closeMM(); if (m) chat.open({ id: m.id, type: 1, name: m.name, avatar: m.avatar }) }
+function mmAt() { const m = mm.value.m; closeMM(); if (m) ctx.emit('composer/append', `@${m.name} `) }
+function mmProfile() { const m = mm.value.m; closeMM(); if (m) g.openProfile(m) }
+/** 宫格成员点击 = 查看资料（与右键菜单同义，QQ 式） */
+function mmProfile2(m: any) { g.openProfile(m) }
+function mmFriend() { const m = mm.value.m; closeMM(); if (m) ctx.social?.apply?.(m.id, 1, '') }
+async function mmGag() {
+  const m = mm.value.m; closeMM()
+  if (!m) return
+  await g.gag?.(m, m.isGag ? 0 : 3600)
 }
 
-function openProfile() {
-  const c = cur.value
-  if (c) ctx.group?.openProfile?.({ id: c.id, name: c.name, avatar: c.avatar, isBot: c.type === 3 })
-}
-
-async function addFriend() {
-  const c = cur.value
-  if (!c) return
-  const remark = window.prompt('验证消息（可留空）：', '') ?? ''
-  try {
-    await ctx.api.applyFriend(c.id, c.type === 3 ? 3 : 1, remark)
-    ctx.ui.toast('好友申请已发送', 'success')
-  } catch (e) { ctx.ui.toast('发送失败：' + e.message, 'error') }
-}
-
-async function kickFriend() {
-  const c = cur.value
-  if (!c || !(await ctx.ui.confirm('删除好友', `确定删除好友「${c.name}」？`, { danger: true }))) return
-  try {
-    await ctx.api.deleteFriend(c.id, c.type === 3 ? 3 : 1)
-    ctx.ui.toast('已删除好友', 'success')
-    await ctx.social?.loadBook?.()
-  } catch (e) { ctx.ui.toast('删除失败：' + e.message, 'error') }
-}
-
-onMounted(loadAll)
-watch(isOpen, (v) => { if (v) loadAll() })
-ctx.on('chat/open', loadAll)
+onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
 </script>
 
 <template>
-  <div v-if="isOpen" class="gp-mask" @click.self="g.close()">
-    <aside class="gp">
-      <header>
-        <b>{{ isGroup ? '群设置' : '会话设置' }}</b>
-        <span class="dim small">{{ cur?.name }}</span>
-        <span class="grow"></span>
-        <button class="gp-x" @click="g.close()">×</button>
-      </header>
+  <!-- QQ 式右侧固定面板：不遮罩、不弹窗，直接贴右展开 -->
+  <aside v-if="isOpen" class="gp">
+    <header>
+      <b>{{ isGroup ? '群聊设置' : '会话设置' }}</b>
+      <span class="grow"></span>
+      <button class="gp-x" title="收起" @click="g.close()">×</button>
+    </header>
 
-      <div class="gp-body">
-        <!-- ============ 私聊：只显示会话相关的设置，不显示群功能 ============ -->
-        <template v-if="!isGroup">
-          <div class="gp-info">
-            <img :src="cur?.avatar ? resUrl(cur.avatar) : fallbackAvatar(cur?.name)" @error="(e: any) => (e.target.src = fallbackAvatar(cur?.name))" alt="" />
-            <div>
-              <b>{{ cur?.name }}</b>
-              <div class="dim small">
-                {{ cur?.type === 3 ? '机器人' : '用户' }} · {{ cur?.id }}
-              </div>
-              <div class="dim small" v-if="!isFriend" style="opacity:.8">你们还不是好友</div>
-            </div>
-          </div>
-
-          <label class="lab">免打扰</label>
-          <div class="row-inline">
-            <button class="ghost small" :class="{ on: noDisturb }" @click="toggleNoDisturb">
-              {{ noDisturb ? '已开启' : '已关闭' }}
-            </button>
-            <span class="dim small">开启后这个会话不再提示</span>
-          </div>
-
-          <label class="lab mt">操作</label>
-          <div class="row-inline">
-            <button class="ghost small" @click="openProfile">查看资料</button>
-            <button v-if="!isFriend && cur?.type !== 3" class="ghost small" @click="addFriend">添加好友</button>
-            <button v-if="isFriend" class="ghost small danger" @click="kickFriend">删除好友</button>
-          </div>
-          <p class="dim small mt-sm">
-            群聊相关的功能（成员 / 群标签 / 群文件 / 群设置）只在群聊里显示。
-          </p>
-        </template>
-
-        <!-- ============ 群聊 ============ -->
-        <template v-else>
-        <div v-if="info" class="gp-info">
-          <img :src="info.avatar ? resUrl(info.avatar) : fallbackAvatar(info.name)" alt=""
-               @error="(e: any) => (e.target.src = fallbackAvatar(info.name))" />
-          <div>
-            <b>{{ info.name }}</b>
-            <div class="dim small">{{ info.headcount }} 人 · {{ info.id }}</div>
-            <div class="dim small" v-if="info.introduction">{{ info.introduction }}</div>
+    <div class="gp-body">
+      <!-- ============ 群聊 ============ -->
+      <template v-if="isGroup">
+        <!-- 群卡片 -->
+        <div class="gp-card">
+          <img :src="info?.avatar ? resUrl(info.avatar) : fallbackAvatar(cur?.name)" alt=""
+               @error="(e: any) => (e.target.src = fallbackAvatar(cur?.name))" />
+          <div class="gp-card-main">
+            <b>{{ info?.name || cur?.name }}</b>
+            <span class="dim small">{{ info?.headcount || '—' }} 人 · {{ cur?.id }}</span>
           </div>
         </div>
 
-        <label class="lab">免打扰</label>
-        <div class="row-inline">
-          <button class="ghost small" :class="{ on: noDisturb }" @click="toggleNoDisturb">
-            <Icon :name="noDisturb ? 'bellOff' : 'bellOn'" :size="14" />
-            {{ noDisturb ? '已开启' : '已关闭' }}
+        <!-- 群聊成员宫格 -->
+        <div class="gp-sec">
+          <span>群聊成员</span>
+          <button class="gp-link" @click="g.setDockTab('members')">查看{{ info?.headcount || '' }}名成员 ›</button>
+        </div>
+        <div class="gp-grid">
+          <button v-for="m in members" :key="m.id" class="gp-cell" :title="m.name"
+                  @click="mmProfile2(m)" @contextmenu.prevent="openMemberMenu(m, $event)">
+            <img :src="m.avatar ? resUrl(m.avatar) : fallbackAvatar(m.name)" alt=""
+                 @error="(e: any) => (e.target.src = fallbackAvatar(m.name))" />
+            <span>{{ (m.name || '').slice(0, 4) }}</span>
           </button>
-          <span class="dim small">开启后本群消息不计未读角标</span>
+          <button class="gp-cell add" title="邀请成员" @click="g.setDockTab('members')">
+            <Icon name="plus" :size="18" /><span>邀请</span>
+          </button>
         </div>
 
-        <label class="lab mt">我在本群的昵称</label>
-        <div class="row-inline">
+        <!-- 群公告 -->
+        <div class="gp-sec"><span>群公告</span></div>
+        <div class="gp-notice" @click="g.setDockTab('info')">{{ info?.introduction || '暂无公告' }} ›</div>
+
+        <!-- 我的本群昵称 -->
+        <div class="gp-sec"><span>我的本群昵称</span></div>
+        <div class="gp-row">
           <input v-model="nick" placeholder="留空则用账号昵称" />
-          <button :disabled="busy" @click="saveNick">保存</button>
+          <button class="ghost small" :disabled="busy" @click="saveNick">保存</button>
         </div>
 
-        <label class="lab mt">群内消息类型限制</label>
-        <div class="chips">
-          <button v-for="t in MSG_TYPES" :key="t.v" class="ghost small"
-                  :class="{ on: limit.includes(t.v) }" @click="toggleLimit(t.v)">{{ t.n }}</button>
+        <!-- 群聊备注（本地） -->
+        <div class="gp-sec"><span>群聊备注</span></div>
+        <div class="gp-row">
+          <input v-model="remark" placeholder="填写备注（本地）" />
+          <button class="ghost small" @click="saveRemark">保存</button>
         </div>
-        <div class="row-inline mt-sm">
-          <span class="dim small">已选：{{ limit.length ? limit.join(',') : '不限制' }}</span>
-          <span class="grow"></span>
-          <button class="ghost small" @click="limit = []">清空</button>
-          <button :disabled="busy" @click="saveLimit">保存限制</button>
+
+        <!-- 开关 -->
+        <label class="gp-switch"><span>设为置顶</span>
+          <button class="sw" :class="{ on: pinned }" @click="togglePin"><i></i></button>
+        </label>
+        <label class="gp-switch"><span>消息免打扰</span>
+          <button class="sw" :class="{ on: muted }" @click="toggleMute"><i></i></button>
+        </label>
+        <!-- 退出群聊：云湖公开接口无 quit/leave-group 端点（Murexide 亦无）→ 按「无后端即砍」不做 -->
+      </template>
+
+      <!-- ============ 私聊 ============ -->
+      <template v-else>
+        <div class="gp-card">
+          <img :src="cur?.avatar ? resUrl(cur.avatar) : fallbackAvatar(cur?.name)" alt=""
+               @error="(e: any) => (e.target.src = fallbackAvatar(cur?.name))" />
+          <div class="gp-card-main">
+            <b>{{ cur?.name }}</b>
+            <span class="dim small">{{ cur?.type === 3 ? '机器人' : '用户' }} · {{ cur?.id }}</span>
+          </div>
         </div>
-        </template>
+        <label class="gp-switch"><span>设为置顶</span>
+          <button class="sw" :class="{ on: pinned }" @click="togglePin"><i></i></button>
+        </label>
+        <label class="gp-switch"><span>消息免打扰</span>
+          <button class="sw" :class="{ on: muted }" @click="toggleMute"><i></i></button>
+        </label>
+        <div class="gp-row mt">
+          <button class="ghost small" @click="g.openProfile(cur)">查看资料</button>
+          <button class="ghost small" @click="ctx.social?.apply?.(cur.id, 1, '')">添加好友</button>
+        </div>
+      </template>
+    </div>
+
+    <!-- 成员右键菜单（QQ 式，只含有后端的项） -->
+    <Teleport to="body">
+      <div v-if="mm.open" class="mm" :style="{ left: mm.x + 'px', top: mm.y + 'px' }" @click.stop>
+        <button class="mm-item" @click="mmSend"><Icon name="send" :size="14" /> 发送消息</button>
+        <button class="mm-item" @click="mmAt"><Icon name="quote" :size="14" /> @ TA</button>
+        <button class="mm-item" @click="mmProfile"><Icon name="user" :size="14" /> 查看资料</button>
+        <button class="mm-item" @click="mmFriend"><Icon name="contacts" :size="14" /> 添加好友</button>
+        <button v-if="isGroup" class="mm-item" @click="mmGag"><Icon name="bellOff" :size="14" /> {{ mm.m?.isGag ? '解除禁言' : '禁言 1 小时' }}</button>
       </div>
-    </aside>
-  </div>
+    </Teleport>
+  </aside>
 </template>
 
 <style scoped>
-.gp-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 82; display: grid; place-items: center; backdrop-filter: blur(3px); }
+/* 右侧固定面板：贴右、全高、不遮罩（QQ 式）。宽度用固定 px，避免 vw 在异常视口退化 */
 .gp {
-  width: min(460px, 94vw); max-height: 82vh; background: var(--card); border: 1px solid var(--line);
-  border-radius: 14px; box-shadow: 0 18px 60px rgba(0, 0, 0, .5);
-  display: flex; flex-direction: column; overflow: hidden;
+  position: fixed; right: 0; top: 0; bottom: 28px; width: 340px;
+  z-index: 66; background: var(--card); border-left: 1px solid var(--line);
+  display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(0, 0, 0, .25);
 }
+@media (max-width: 900px) { .gp { width: 86vw; } }
 .gp > header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .gp > header .grow { flex: 1; }
 .gp-x { background: transparent; color: var(--fg2); font-size: 20px; padding: 0 8px; line-height: 1; }
-.gp-x:hover { color: var(--err); background: transparent; }
-.gp-body { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; }
-.gp-info { display: flex; gap: 10px; align-items: center; padding: 10px; background: var(--card2); border-radius: 10px; margin-bottom: 14px; }
-.gp-info img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--card2); }
-.lab { font-size: 12.5px; color: var(--fg2); margin-bottom: 6px; }
-.lab.mt { margin-top: 18px; }
-.row-inline { display: flex; gap: 8px; align-items: center; }
-.row-inline input { flex: 1; }
-.row-inline .grow { flex: 1; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chips .on { background: var(--acc); color: #fff; border-color: transparent; }
+.gp-body { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.gp-card { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.gp-card img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--card2); }
+.gp-card-main { min-width: 0; }
+.gp-card-main b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gp-sec { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--fg2); margin: 10px 0 6px; }
+.gp-link { background: none; border: none; color: var(--acc); font-size: 12px; cursor: pointer; padding: 0; }
+.gp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.gp-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px;
+  border: none; border-radius: 8px; background: none; color: var(--fg2); font-size: 10.5px; cursor: pointer;
+}
+.gp-cell:hover { background: var(--card2); color: var(--fg); }
+.gp-cell img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: var(--card2); }
+.gp-cell.add { border: 1px dashed var(--line); }
+.gp-notice {
+  font-size: 12.5px; color: var(--fg2); background: var(--card2); border-radius: 8px;
+  padding: 8px 10px; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.gp-row { display: flex; gap: 8px; align-items: center; }
+.gp-row input {
+  flex: 1; min-width: 0; background: var(--card2); border: 1px solid var(--line);
+  border-radius: 8px; color: var(--fg); padding: 7px 10px; font-size: 13px; outline: none;
+}
+.gp-row input:focus { border-color: var(--acc); }
+.gp-switch {
+  display: flex; justify-content: space-between; align-items: center; padding: 9px 2px;
+  font-size: 13px; color: var(--fg); cursor: pointer; border-bottom: 1px solid var(--line);
+}
+.sw {
+  width: 38px; height: 21px; border-radius: 999px; border: none; background: var(--line);
+  position: relative; cursor: pointer; transition: background .15s;
+}
+.sw i {
+  position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%;
+  background: #fff; transition: left .15s;
+}
+.sw.on { background: var(--acc); }
+.sw.on i { left: 19px; }
+.gp-danger {
+  margin-top: 14px; padding: 9px 0; border-radius: 9px; border: none;
+  background: color-mix(in srgb, var(--err) 14%, transparent); color: var(--err); font-size: 13.5px; cursor: pointer;
+}
+.gp-danger:hover { background: color-mix(in srgb, var(--err) 24%, transparent); }
+.mt { margin-top: 10px; }
+/* 成员右键菜单 */
+.mm {
+  position: fixed; z-index: 90; min-width: 150px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 5px;
+}
+.mm-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 10px; border: none; border-radius: 7px; background: none;
+  color: var(--fg); font-size: 13px; cursor: pointer;
+}
+.mm-item:hover { background: var(--card2); }
 </style>
