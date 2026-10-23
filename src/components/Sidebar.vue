@@ -21,6 +21,29 @@ const chat = ctx.chat
 const list = computed(() => chat.filtered())
 function open(c: any) { chat.open(c) }
 
+/* ---- 全局搜索（Enter 触发 /v1/search/home-search：人/群/机器人混合结果） ---- */
+const GS_TYPE: Record<number, string> = { 1: '用户', 2: '群聊', 3: '机器人' }
+const gsResults = ref<any[]>([])
+async function globalSearch() {
+  const w = chat.state.keyword.trim()
+  if (!w) { gsResults.value = []; return }
+  try {
+    const d = await ctx.api.homeSearch(w)
+    // 返回结构按类别分组，摊平成一列（带 type）
+    const out: any[] = []
+    for (const key of ['users', 'groups', 'bots']) {
+      for (const it of d[key] || []) out.push({ ...it, type: key === 'users' ? 1 : key === 'groups' ? 2 : 3 })
+    }
+    gsResults.value = out.slice(0, 8)
+  } catch (e: any) { ctx.ui?.toast?.('搜索失败：' + e.message, 'error') }
+}
+function gsPick(r: any) {
+  gsResults.value = []
+  if (r.type === 2) chat.open({ id: r.id, type: 2, name: r.name, avatar: r.avatar })
+  else if (r.type === 3) chat.open({ id: r.id, type: 3, name: r.name, avatar: r.avatar })
+  else ctx.group?.openProfile?.(r)   // 用户 → 资料面板
+}
+
 /* ---------------- 会话分组（本地，存 localStorage） ---------------- */
 // 注意：filtered 是函数，必须调用 —— 之前少个括号导致侧栏一条会话都不显示
 const sections = computed(() => chat.sections(chat.filtered()))
@@ -178,7 +201,15 @@ async function dlgOk() {
                :is="sl.component" v-bind="sl.props || {}" />
 
     <div class="search">
-      <input v-model="chat.state.keyword" placeholder="搜索会话…" />
+      <input v-model="chat.state.keyword" placeholder="搜索会话…" @keyup.enter="globalSearch" />
+      <!-- 全局搜索结果（/v1/search/home-search：人/群/机器人混合） -->
+      <div v-if="gsResults.length" class="gs-pop">
+        <button v-for="r in gsResults" :key="r.id + r.type" class="gs-item" @click="gsPick(r)">
+          <img :src="r.avatar ? resUrl(r.avatar) : fallbackAvatar(r.name)" alt="" />
+          <span>{{ r.name }}</span>
+          <em class="dim small">{{ GS_TYPE[r.type] || '' }}</em>
+        </button>
+      </div>
     </div>
 
     <!-- 会话分组（本地）：有分组时按分组渲染，可折叠 -->

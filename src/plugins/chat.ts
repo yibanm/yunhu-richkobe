@@ -217,6 +217,7 @@ export const chatPlugin = {
         convGroups.hidden = convGroups.hidden.filter((x: string) => x !== convId)
         saveGroups()
       },
+      isHidden(convId: string) { return convGroups.hidden.includes(convId) },
       /** 侧栏渲染用：分组 + 未分组 */
       sections(list: any[]) {
         const byGroup: Record<string, any[]> = {}
@@ -717,6 +718,17 @@ export const chatPlugin = {
       /* 会话分组（本地） */
       ...groupApi,
       close: () => { state.current = null; state.messages = []; saveCurrentId(null) },
+      /** 清除某会话的本机消息缓存（云端记录不动；云湖无删记录端点） */
+      clearLocal(convId: string) {
+        if (state.current?.id === convId) state.messages = []
+        ensureCache().then((c) => {
+          if (Array.isArray(c.convs)) {
+            const hit = c.convs.find((x: any) => x.id === convId)
+            if (hit) { hit.preview = ''; }
+          }
+          return storage?.save('cache', c).catch(() => {})
+        })
+      },
       /** ChatView 滚动时调用：标记是否贴在底部（决定新消息要不要自动滚） */
       setAtBottom,
     }

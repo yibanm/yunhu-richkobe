@@ -27,6 +27,31 @@ const members = computed(() => (g.state.members || []).slice(0, 14))
 const nick = ref('')
 const remark = ref('')
 const busy = ref(false)
+
+/* 群消息设置（消息类型限制，/v1/group/msg-type-limit） */
+const MSG_TYPES = [
+  { v: 1, n: '文本' }, { v: 2, n: '图片' }, { v: 3, n: 'Markdown' },
+  { v: 4, n: '文件' }, { v: 7, n: '表情' }, { v: 10, n: '视频' }, { v: 11, n: '语音' },
+]
+const limit = ref<number[]>([])
+watch([isOpen, info], () => {
+  const raw = String(info.value?.limitedMsgType || '')
+  limit.value = raw ? raw.split(',').map(Number).filter(Boolean) : []
+})
+function toggleLimit(v: number) {
+  const i = limit.value.indexOf(v)
+  if (i >= 0) limit.value.splice(i, 1)
+  else limit.value.push(v)
+}
+async function saveLimit() {
+  if (busy.value || !cur.value) return
+  busy.value = true
+  try {
+    await ctx.api.setMsgTypeLimit(cur.value.id, limit.value.join(','))
+    ctx.ui?.toast?.('群消息设置已保存', 'success')
+  } catch (e: any) { ctx.ui?.toast?.('保存失败：' + e.message, 'error') }
+  finally { busy.value = false }
+}
 watch([isOpen, cur], async () => {
   if (!isOpen.value || !cur.value) return
   nick.value = info.value?.myGroupNickname || ''
@@ -45,8 +70,10 @@ async function saveNick() {
 }
 function saveRemark() {
   if (!cur.value) return
+  // 本地先存（即时生效），再云同步（多端可见；失败不阻塞）
   localStorage.setItem('yh.remark.' + cur.value.id, remark.value)
-  ctx.ui?.toast?.('备注已保存（本地）', 'success')
+  if (!isGroup.value) ctx.api?.saveUserRemarks?.(cur.value.id, remark.value).catch(() => {})
+  ctx.ui?.toast?.('备注已保存', 'success')
 }
 
 /* 置顶 / 免打扰开关（本地，与右键菜单联动） */
@@ -59,6 +86,57 @@ async function toggleMute() {
   chat.toggleMute(cur.value.id)
   // 云端同步（失败不阻塞本地）
   try { await ctx.api?.noNotify?.(cur.value.id, cur.value.type || 1, next) } catch { /* 本地已生效 */ }
+}
+
+/* 群主判定（管理区可见性） */
+const isOwner = computed(() => {
+  const me = ctx.auth?.state?.user?.id
+  const info = g.state.info
+  return !!me && (info?.owner === me || info?.createBy === me)
+})
+
+/* 群消息设置下拉：0 提醒 / 1 不提醒 / 2 屏蔽（映射到免打扰 + 本地隐藏） */
+const notifyMode = computed(() => {
+  if (!cur.value) return 0
+  if (chat.isHidden?.(cur.value.id)) return 2
+  return muted.value ? 1 : 0
+})
+async function setNotifyMode(v: number) {
+  const c = cur.value
+  if (!c) return
+  if (v === 2) { chat.hideConv(c.id); g.close(); return }
+  const wantMute = v === 1
+  if (muted.value !== wantMute) await toggleMute()
+}
+
+/** 分享群：复制群号+群名到剪贴板 */
+async function shareGroup() {
+  const c = cur.value
+  if (!c) return
+  const text = `${c.name}（群号 ${c.id}）`
+  try { await navigator.clipboard.writeText(text); ctx.ui?.toast?.('已复制分享文本', 'success') }
+  catch { ctx.ui?.toast?.('复制失败', 'error') }
+}
+
+/** 删除聊天记录（本地缓存）：清当前会话消息与本地快照；云端记录不受影响（云湖无删记录端点） */
+async function clearLocalHistory() {
+  const c = cur.value
+  if (!c) return
+  if (!(await ctx.ui?.confirm?.('删除聊天记录', `清除「${c.name}」在本机的消息缓存？\n（云端记录不受影响）`, { danger: true }))) return
+  chat.clearLocal?.(c.id)
+  ctx.ui?.toast?.('本地聊天记录已清除', 'success')
+}
+
+/** 举报该群（/v1/report/create；确认框为应用内弹窗，不用原生 prompt） */
+async function reportGroup() {
+  const c = cur.value
+  if (!c) return
+  const ok = await ctx.ui?.confirm?.('举报该群', `确定举报「${c.name}」？\n理由：骚扰/违规内容`, { okText: '提交举报', danger: true })
+  if (!ok) return
+  try {
+    await ctx.api.report(c.id, 2, c.name, '骚扰/违规内容')
+    ctx.ui?.toast?.('举报已提交', 'success')
+  } catch (e: any) { ctx.ui?.toast?.('举报失败：' + e.message, 'error') }
 }
 
 /* 成员右键菜单（QQ 式） */
@@ -77,6 +155,23 @@ function mmAt() { const m = mm.value.m; closeMM(); if (m) ctx.emit('composer/app
 function mmProfile() { const m = mm.value.m; closeMM(); if (m) g.openProfile(m) }
 /** 宫格成员点击 = 查看资料（与右键菜单同义，QQ 式） */
 function mmProfile2(m: any) { g.openProfile(m) }
+
+/* 私聊：是否好友 + 删除好友（/v1/friend/delete-friend，审计补齐 UI） */
+const isFriend = computed(() => {
+  const id = cur.value?.id
+  if (!id) return false
+  try { return (ctx.social?.state?.book?.users || []).some((u: any) => u.id === id) } catch { return false }
+})
+async function delFriend() {
+  const c = cur.value
+  if (!c) return
+  if (!(await ctx.ui?.confirm?.('删除好友', `确定删除好友「${c.name}」？`, { danger: true }))) return
+  try {
+    await ctx.api.deleteFriend(c.id, c.type === 3 ? 3 : 1)
+    ctx.ui?.toast?.('已删除好友', 'success')
+    ctx.social?.loadBook?.()
+  } catch (e: any) { ctx.ui?.toast?.('删除失败：' + e.message, 'error') }
+}
 function mmFriend() { const m = mm.value.m; closeMM(); if (m) ctx.social?.apply?.(m.id, 1, '') }
 async function mmGag() {
   const m = mm.value.m; closeMM()
@@ -107,6 +202,9 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
             <b>{{ info?.name || cur?.name }}</b>
             <span class="dim small">{{ info?.headcount || '—' }} 人 · {{ cur?.id }}</span>
           </div>
+          <button class="ghost small" title="复制群号与群名（分享）" @click="shareGroup">
+            <Icon name="forward" :size="13" /> 分享
+          </button>
         </div>
 
         <!-- 群聊成员宫格 -->
@@ -151,7 +249,29 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
         <label class="gp-switch"><span>消息免打扰</span>
           <button class="sw" :class="{ on: muted }" @click="toggleMute"><i></i></button>
         </label>
-        <!-- 退出群聊：云湖公开接口无 quit/leave-group 端点（Murexide 亦无）→ 按「无后端即砍」不做 -->
+
+        <!-- 群主：消息类型限制（/v1/group/msg-type-limit） -->
+        <template v-if="isOwner">
+          <div class="gp-sec"><span>允许发送的消息类型（群主）</span></div>
+          <div class="gp-chips">
+            <button v-for="t in MSG_TYPES" :key="t.v" class="ghost small"
+                    :class="{ on: limit.includes(t.v) }" @click="toggleLimit(t.v)">{{ t.n }}</button>
+            <button class="ghost small" :disabled="busy" @click="saveLimit">保存</button>
+          </div>
+        </template>
+
+        <!-- 群消息设置（QQ 截图同款下拉：接收并提醒/接收但不提醒/屏蔽） -->
+        <div class="gp-sec"><span>群消息设置</span></div>
+        <select class="gp-select" :value="notifyMode" @change="setNotifyMode(Number(($event.target as any).value))">
+          <option :value="0">接收消息并提醒</option>
+          <option :value="1">接收消息但不提醒</option>
+          <option :value="2">屏蔽群消息</option>
+        </select>
+
+        <!-- 删除聊天记录：云端无删记录端点，此处清本地缓存（消息 state + 会话快照），隐私向实质功能 -->
+        <button class="gp-clear" @click="clearLocalHistory">删除聊天记录（本地缓存）</button>
+
+        <button class="gp-report" @click="reportGroup">被骚扰了？举报该群</button>
       </template>
 
       <!-- ============ 私聊 ============ -->
@@ -173,6 +293,7 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
         <div class="gp-row mt">
           <button class="ghost small" @click="g.openProfile(cur)">查看资料</button>
           <button class="ghost small" @click="ctx.social?.apply?.(cur.id, 1, '')">添加好友</button>
+          <button v-if="isFriend" class="ghost small danger" @click="delFriend">删除好友</button>
         </div>
       </template>
     </div>
@@ -245,7 +366,25 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
   background: color-mix(in srgb, var(--err) 14%, transparent); color: var(--err); font-size: 13.5px; cursor: pointer;
 }
 .gp-danger:hover { background: color-mix(in srgb, var(--err) 24%, transparent); }
+.gp-select {
+  width: 100%; background: var(--card2); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--fg); padding: 9px 10px; font-size: 13px; outline: none;
+}
+.gp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gp-report {
+  margin-top: 10px; padding: 8px 0; border: none; border-radius: 9px; background: none;
+  color: var(--acc); font-size: 12.5px; cursor: pointer; text-align: center;
+}
+.gp-report:hover { background: var(--acc-soft, var(--card2)); }
+.gp-clear {
+  margin-top: 8px; padding: 9px 0; border-radius: 9px; border: none;
+  background: color-mix(in srgb, var(--err) 12%, transparent); color: var(--err);
+  font-size: 13px; cursor: pointer;
+}
+.gp-clear:hover { background: color-mix(in srgb, var(--err) 22%, transparent); }
 .mt { margin-top: 10px; }
+.gp-msglimit { display: flex; flex-direction: column; gap: 8px; }
+.gp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 成员右键菜单 */
 .mm {
   position: fixed; z-index: 90; min-width: 150px; background: var(--card);

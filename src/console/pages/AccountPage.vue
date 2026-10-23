@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 账号页（含原「设置」板块内容：账号信息/个人资料，设置板块已并入此处） */
-import { inject, computed } from 'vue'
+import { inject, computed, ref } from 'vue'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
 import SettingsFrag from './SettingsPage.vue'
@@ -17,6 +17,18 @@ const user = computed(() => auth.state.user || {})
 const wsText = computed(() => ({
   online: '实时在线', connecting: '连接中', retry: '重连中', closed: '已断开', idle: '未连接',
 }[ws?.state.status] || '—'))
+
+/* 在线设备与金币明细（审计补齐的两个云端接口） */
+const devices = ref<any[] | null>(null)
+const coins = ref<any[]>([])
+async function loadDevices() {
+  try { devices.value = (await api.userClients?.()) || [] } catch { devices.value = [] }
+}
+async function loadCoins() {
+  try { coins.value = (await api.coinRecords?.()) || [] } catch { coins.value = [] }
+}
+loadDevices()
+loadCoins()
 </script>
 
 <template>
@@ -46,6 +58,31 @@ const wsText = computed(() => ({
       </div>
       <div class="kv" v-if="ws?.state.error"><span class="k">最近错误</span><span class="err">{{ ws.state.error }}</span></div>
       <button class="ghost small mt-sm" @click="ws?.reconnect()">重新连接</button>
+    </KCard>
+
+    <!-- 在线设备（/v1/user/clients，审计补齐） -->
+    <KCard title="在线设备" class="mt">
+      <div v-if="devices === null" class="dim small">加载中…</div>
+      <div v-else-if="!devices.length" class="dim small">暂无设备信息</div>
+      <div v-for="d in devices" :key="d.deviceId" class="kv">
+        <span class="k">{{ d.platform || '设备' }}</span>
+        <span>
+          <span class="dot" :class="d.online ? 'on' : 'wait'"></span>
+          {{ d.deviceId }}
+        </span>
+      </div>
+      <button class="ghost small mt-sm" @click="loadDevices">刷新</button>
+    </KCard>
+
+    <!-- 金币明细（/v1/user/gold-coin-increase-decrease-record） -->
+    <KCard title="金币明细" class="mt">
+      <div v-if="!coins.length" class="dim small">暂无收支记录</div>
+      <div v-for="(c, i) in coins" :key="i" class="kv">
+        <span class="k">{{ c.remark || c.type || '变动' }}</span>
+        <span :class="(c.num ?? c.amount ?? 0) >= 0 ? 'ok' : 'err'">
+          {{ (c.num ?? c.amount ?? 0) >= 0 ? '+' : '' }}{{ c.num ?? c.amount ?? 0 }}
+        </span>
+      </div>
     </KCard>
 
     <KCard title="外观" class="mt">

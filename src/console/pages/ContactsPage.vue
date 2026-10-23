@@ -15,13 +15,38 @@ const ctx = inject<any>('ctx')
 const sc = ctx.social
 const s = sc.state
 
-const tab = ref<'users' | 'groups' | 'bots'>('users')
+const tab = ref<'users' | 'groups' | 'bots' | 'discover'>('users')
 const kw = ref('')
 const addOpen = ref(false)
 const addForm = ref({ targetId: '', chatType: 1, message: '' })
 const newGroup = ref({ name: '', introduction: '' })
 
+/* ---- 「发现」：推荐分区 + 分区内推荐群（/v1/user/recommend-*） ---- */
+const discLoading = ref(false)
+const discCats = ref<any[]>([])
+const discItems = ref<Record<string, any[]>>({})
+async function openDiscover() {
+  tab.value = 'discover'
+  if (discCats.value.length || discLoading.value) return
+  discLoading.value = true
+  try {
+    const cats = await ctx.api.recommendCategories()
+    discCats.value = cats.slice(0, 6)
+    for (const c of discCats.value) {
+      discItems.value[c.id] = (await ctx.api.recommendList(c.id).catch(() => [])).slice(0, 6)
+    }
+  } catch (e: any) { ctx.ui?.toast?.('推荐加载失败：' + e.message, 'error') }
+  finally { discLoading.value = false }
+}
+async function applyJoin(it: any) {
+  try {
+    await sc.apply(String(it.id), 2, '')
+    ctx.ui?.toast?.('入群申请已发送', 'success')
+  } catch { /* social 已提示 */ }
+}
+
 const current = computed(() => {
+  if (tab.value === 'discover') return []
   const list = s.book?.[tab.value] || []
   const k = kw.value.trim()
   return k ? list.filter((x: any) => (x.name || '').includes(k) || (x.remark || '').includes(k) || x.id.includes(k)) : list
@@ -117,10 +142,30 @@ function showProfile(it: any) {
         <button class="ghost small" :class="{ on: tab === 'users' }" @click="tab = 'users'">用户</button>
         <button class="ghost small" :class="{ on: tab === 'groups' }" @click="tab = 'groups'">群聊</button>
         <button class="ghost small" :class="{ on: tab === 'bots' }" @click="tab = 'bots'">机器人</button>
+        <button class="ghost small" :class="{ on: tab === 'discover' }" @click="openDiscover">发现</button>
         <input v-model="kw" placeholder="搜索…" style="max-width: 180px" />
         <span class="dim small">共 {{ current.length }} 个</span>
       </div>
-      <div class="list">
+      <div v-if="tab === 'discover'" class="list">
+        <div v-if="discLoading" class="dim center">加载推荐…</div>
+        <template v-else>
+          <div v-for="cat in discCats" :key="cat.id" class="disc-cat">
+            <div class="dim small" style="padding:6px 2px">{{ cat.name || cat.categoryName }}</div>
+            <div class="item" v-for="it in (discItems[cat.id] || [])" :key="it.id">
+              <img :src="it.avatar ? resUrl(it.avatar) : fallbackAvatar(it.name)" @error="(e: any) => (e.target.src = fallbackAvatar(it.name))" alt="" />
+              <div class="imain">
+                <div class="iname">{{ it.name }}</div>
+                <div class="dim small">{{ it.introduction || ('ID ' + it.id) }}</div>
+              </div>
+              <div class="acts">
+                <button class="small" @click="applyJoin(it)">申请加入</button>
+              </div>
+            </div>
+          </div>
+          <p v-if="!discCats.length" class="dim center">暂无推荐内容</p>
+        </template>
+      </div>
+      <div v-else class="list">
         <div class="item" v-for="it in current" :key="it.id">
           <img :src="it.avatar ? resUrl(it.avatar) : fallbackAvatar(it.name)" @error="(e: any) => (e.target.src = fallbackAvatar(it.name))" alt="" />
           <div class="imain">

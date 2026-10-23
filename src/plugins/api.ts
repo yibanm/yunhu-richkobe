@@ -44,7 +44,7 @@ function decodeContent(bytes) {
   return {
     text: s(1), buttons: s(2), image_url: s(3), file_name: s(4), file_url: s(5),
     mentioned_id: pb.list(c, 6).map(b => new TextDecoder().decode(b)),
-    form: s(7), quote_msg_text: s(8), image: s(9),
+    form: s(7), quote_msg_text: s(8), image: s(9), sticker_url: s(9),
     post_id: s(10), post_title: s(11), post_content: s(12), post_content_type: n(13),
     expression_id: s(15), quote_image_url: s(16), file_size: n(18),
     video_url: s(19), audio_url: s(21), audio_time: n(22),
@@ -797,10 +797,20 @@ export const apiPlugin = {
 
       /* ================= 上传 ================= */
 
-      /** 七牛上传 token：图片走 qiniu-token，其它走 qiniu-token2 */
+      /**
+       * 七牛上传 token：按媒体类型走专用端点（Murexide QiniuUploadUtil 实测对照）：
+       *   image → qiniu-token；video → qiniu-token-video（video 桶）；
+       *   audio → qiniu-token-audio（失败回退 token2）；file/sticker → qiniu-token2。
+       * 视频/音频走错桶会上传失败或存错桶读不回（「音视频上传失败」根因之一）。
+       */
       async uploadToken(kind: 'image' | 'file' | 'audio' | 'video' | 'sticker' = 'image') {
-        const path = kind === 'image' ? '/v1/misc/qiniu-token' : '/v1/misc/qiniu-token2'
-        const r = await request(path, { method: 'GET' })
+        const path = kind === 'image' ? '/v1/misc/qiniu-token'
+          : kind === 'video' ? '/v1/misc/qiniu-token-video'
+            : kind === 'audio' ? '/v1/misc/qiniu-token-audio'
+              : '/v1/misc/qiniu-token2'
+        let r = await request(path, { method: 'GET' })
+        // audio 专用端点若云端未开，回退通用 token2（不阻塞发送）
+        if (kind === 'audio' && r.http !== 200) r = await request('/v1/misc/qiniu-token2', { method: 'GET' })
         assertOk(r)
         const t = r.json?.data?.token
         if (!t) throw new Error('未取得上传 token')
@@ -911,6 +921,107 @@ export const apiPlugin = {
       /** 设置消息类型限制（type 传 "1,2,3" 这样的串） */
       async setMsgTypeLimit(groupId: string, type: string) {
         return assertOk(await request('/v1/group/msg-type-limit', { body: { groupId, type } }))
+      },
+
+      /* ================= 审计补齐（对照 Yhchat_md3/Murexide 实测形态） ================= */
+
+      /** 退出登录时通知云端注销本设备（否则「在线设备」残留） */
+      async logoutDevice(deviceId: string) {
+        return request('/v1/user/logout', { body: { deviceId } }).catch(() => null)
+      },
+      /** 保存好友备注（云端多端同步） */
+      async saveUserRemarks(friendId: string, name: string, phone = '', others = '') {
+        return assertOk(await request('/v1/user/save-user-remarks', { body: { friendId, name, phone, others } }))
+      },
+      /** 在线设备列表（protobuf） */
+      async userClients() {
+        const r = await request('/v1/user/clients', { method: 'GET' })
+        assertOk(r)
+        return pb.each(r.pb, 2).map((d: any) => ({
+          deviceId: pb.str(d, 1), platform: pb.str(d, 2), online: pb.bool(d, 3), ts: pb.num(d, 4),
+        }))
+      },
+      /** 金币收支明细 */
+      async coinRecords(page = 1, size = 20) {
+        const r = await request('/v1/user/gold-coin-increase-decrease-record', { body: { page, size } })
+        assertOk(r)
+        return r.json?.data?.records || r.json?.data?.list || []
+      },
+      /** 拉黑/取消拉黑用户 */
+      async setBlackList(userId: string, isAdd: boolean) {
+        return assertOk(await request('/v1/community/set-black-list', { body: { userId, isAdd: isAdd ? 1 : 0 } }))
+      },
+      /** 黑名单列表 */
+      async getBlackList(page = 1, size = 50) {
+        const r = await request('/v1/community/black-list', { body: { page, size } })
+        assertOk(r)
+        return r.json?.data?.list || r.json?.data?.users || []
+      },
+      /** 同意入群邀请/申请 */
+      async agreeGroupInvite(inviteId: string) {
+        return assertOk(await request('/v1/group/agree-invite', { body: { inviteId } }))
+      },
+      /** 移除群机器人 */
+      async removeGroupBot(groupId: string, botId: string) {
+        return assertOk(await request('/v1/group/remove-bot', { body: { groupId, botId } }))
+      },
+      /** 设置/取消群管理员（userLevel 2=管理员 0=普通） */
+      async setManageSetting(groupId: string, userId: string, userLevel: number) {
+        return assertOk(await request('/v1/group/manage-setting', { body: { groupId, userId, userLevel } }))
+      },
+      /** 群消息自动删除时长（秒，0=关） */
+      async editAutoDeleteMessage(groupId: string, seconds: number) {
+        return assertOk(await request('/v1/group/edit-auto-delete-message', { body: { groupId, time: seconds } }))
+      },
+      /** 群口令（仅群主） */
+      async editGroupKeyword(groupId: string, keyword: string) {
+        return assertOk(await request('/v1/group/edit-group-keyword', { body: { groupId, keyword } }))
+      },
+      /** 全局搜索（人/群/机器人/帖子混合结果） */
+      async homeSearch(word: string) {
+        const r = await request('/v1/search/home-search', { body: { word } })
+        assertOk(r)
+        return r.json?.data || {}
+      },
+      /** 按 msgId 拉前后一段消息（定位跳转用）；proto: seq=3 chatType=4 chatId=5 unknown=6 count=7 msgId=8 */
+      async messagesAround(chatId: string, chatType: number, msgId: string, count = 20, seq = 0) {
+        const body = pb.build(pb.fNum(3, seq), pb.fNum(4, chatType), pb.fStr(5, chatId), pb.fNum(6, 0), pb.fNum(7, count), pb.fStr(8, msgId))
+        const r = assertOk(await request('/v1/msg/list-message-by-mid-seq', { body }))
+        return pb.each(r.pb, 2).map(decodeMsg).sort((a: any, b: any) => a.ts - b.ts)
+      },
+      /** 收藏（他人分享的）贴纸包到自己账号 */
+      async stickerAddPack(id: number) {
+        return assertOk(await request('/v1/sticker/add', { body: { id } }))
+      },
+      /** 收藏贴纸包排序：[{id, sort}] */
+      async stickerSort(items: Array<{ id: number; sort: number }>) {
+        return assertOk(await request('/v1/sticker/sort', { body: { sort: items } }))
+      },
+      /** 群网盘重命名 */
+      async diskRename(chatId: string, chatType: number, fileId: number, newName: string) {
+        return assertOk(await request('/v1/disk/rename', { body: { chatId, chatType, fileId, newName } }))
+      },
+      /** 「发现」页：推荐分区列表 */
+      async recommendCategories() {
+        const r = await request('/v1/user/recommend-category-list', { body: {} })
+        assertOk(r)
+        return r.json?.data?.list || r.json?.data?.categories || []
+      },
+      /** 「发现」页：分区内推荐群/机器人 */
+      async recommendList(categoryId: number | string) {
+        const r = await request('/v1/user/recommend-list', { body: { categoryId } })
+        assertOk(r)
+        return r.json?.data?.list || []
+      },
+      /** 「发现」页：推荐机器人 */
+      async recommendBots() {
+        const r = await request('/v1/user/recommend', { body: {} })
+        assertOk(r)
+        return r.json?.data?.list || r.json?.data?.bots || []
+      },
+      /** 举报用户/群/机器人（/v1/report/create） */
+      async report(chatId: string, chatType: number, chatName: string, content: string) {
+        return assertOk(await request('/v1/report/create', { body: { chatId, chatType, chatName, content } }))
       },
 
       /** 编辑群聊信息（只传要改的字段） */

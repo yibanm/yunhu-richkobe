@@ -82,6 +82,43 @@ async function favFromPack(e: any) {
   const full = /^https?:\/\//i.test(u) ? u : `https://chat-img.jwznb.com/${String(u).replace(/^\/+/, '')}`
   await st.addFromUrl?.(full)
 }
+
+/* ---- 收藏他人表情包（/v1/sticker/add）与单贴纸管理（rename/remove） ---- */
+const addPackOpen = ref(false)
+const addPackId = ref('')
+async function addPack() {
+  const id = Number(addPackId.value.trim())
+  if (!id) return
+  try {
+    await ctx.api.stickerAddPack(id)
+    ctx.ui?.toast?.('表情包已收藏', 'success')
+    addPackId.value = ''
+    addPackOpen.value = false
+    await st.loadPacks()
+  } catch (e: any) { ctx.ui?.toast?.('收藏失败：' + e.message, 'error') }
+}
+async function renameSticker(e: any) {
+  renaming.value = { id: e.id, name: e.name || '' }
+}
+const renaming = ref<{ id: number; name: string } | null>(null)
+async function renameStickerOk() {
+  const rn = renaming.value
+  renaming.value = null
+  if (!rn || !rn.name.trim()) return
+  try {
+    await ctx.api.stickerRenameSticker(rn.id, rn.name.trim())
+    ctx.ui?.toast?.('已重命名', 'success')
+    await st.loadPacks()
+  } catch (err: any) { ctx.ui?.toast?.('重命名失败：' + err.message, 'error') }
+}
+async function removeSticker(e: any) {
+  if (!(await ctx.ui?.confirm?.('删除贴纸', `从表情包中删除这张贴纸？`, { danger: true }))) return
+  try {
+    await ctx.api.stickerRemoveSticker(tab.value as number, e.id)
+    ctx.ui?.toast?.('已删除', 'success')
+    await st.loadPacks()
+  } catch (err: any) { ctx.ui?.toast?.('删除失败：' + err.message, 'error') }
+}
 </script>
 
 <template>
@@ -105,7 +142,13 @@ async function favFromPack(e: any) {
         <button v-for="p in s.packs" :key="p.id" class="sp-tab" :class="{ on: tab === p.id }" @click="pickTab(p.id)">
           {{ p.name }} <em>{{ p.items?.length || 0 }}</em>
         </button>
+        <span class="grow"></span>
+        <button class="ghost tiny" title="输入表情包 ID 收藏到账号" @click="addPackOpen = !addPackOpen">+ 收藏表情包</button>
         <span v-if="s.packsLoading" class="dim small">加载表情包…</span>
+      </div>
+      <div v-if="addPackOpen" class="sp-addrow">
+        <input v-model="addPackId" placeholder="表情包 ID" inputmode="numeric" />
+        <button class="ghost tiny" :disabled="!addPackId.trim()" @click="addPack">收藏</button>
       </div>
 
       <div class="sp-body">
@@ -123,6 +166,10 @@ async function favFromPack(e: any) {
                     @click="st.send(e)" @contextmenu.prevent="favFromPack(e)">
               <img :src="src(e)" loading="lazy" alt=""
                    @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
+              <span class="cell-acts">
+                <span class="ca" title="重命名" @click.stop="renameSticker(e)">✎</span>
+                <span class="ca del" title="从包中删除" @click.stop="removeSticker(e)">×</span>
+              </span>
             </button>
           </template>
         </div>
@@ -152,6 +199,22 @@ async function favFromPack(e: any) {
 .sp-tab:hover { color: var(--fg); }
 .sp-tab.on { color: var(--acc); border-bottom-color: var(--acc); font-weight: 600; }
 .sp-tab em { font-style: normal; font-size: 10.5px; color: var(--fg2); margin-left: 3px; }
+.sp-tabs .grow { flex: 1; }
+.sp-addrow { display: flex; gap: 6px; padding: 6px 12px; }
+.sp-addrow input {
+  flex: 1; background: var(--card2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--fg); padding: 5px 9px; font-size: 12.5px; outline: none;
+}
+.cell { position: relative; }
+.cell-acts {
+  position: absolute; top: 2px; left: 2px; display: none; gap: 3px;
+}
+.cell:hover .cell-acts { display: flex; }
+.cell-acts .ca {
+  width: 18px; height: 18px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff;
+  font-size: 11px; line-height: 1; display: grid; place-items: center; cursor: pointer;
+}
+.cell-acts .ca.del:hover { background: var(--err); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
 .cell { position: relative; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 9px; background: var(--card2); padding: 4px; cursor: pointer; overflow: hidden; }
 .cell:hover { border-color: var(--acc); }

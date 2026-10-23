@@ -68,6 +68,19 @@ async function addFriend() {
   } catch (e: any) { ui.toast('申请失败：' + e.message, 'error') }
 }
 
+/** 拉黑/取消拉黑（/v1/community/set-black-list，审计补齐 UI） */
+async function toggleBlack() {
+  const id = data.value?.id || g.state.profileUser?.id
+  if (!id) return
+  const next = !data.value?.isBlocked
+  if (next && !(await ui.confirm?.('拉黑用户', `拉黑后对方消息将不再显示，确定拉黑？`, { danger: true }))) return
+  try {
+    await api.setBlackList(id, next)
+    ui.toast(next ? '已拉黑' : '已取消拉黑', 'success')
+    data.value = { ...data.value, isBlocked: next }
+  } catch (e: any) { ui.toast('操作失败：' + e.message, 'error') }
+}
+
 async function load() {
   const u = g.state.profileUser
   if (!u) { data.value = null; return }
@@ -207,6 +220,9 @@ function copyId() {
             <span class="dim small" style="align-self:center">你们还不是好友</span>
           </template>
           <button v-else-if="!isMe" class="small" @click="chatWith">发消息</button>
+          <button v-if="!isMe && !data.isBot" class="ghost small" :class="{ danger: data.isBlocked }" @click="toggleBlack">
+            {{ data.isBlocked ? '取消拉黑' : '拉黑' }}
+          </button>
           <button class="ghost small" @click="copyId">复制 ID</button>
           <button class="ghost small" @click="load">刷新</button>
         </div>

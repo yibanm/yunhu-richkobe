@@ -1,0 +1,119 @@
+/* ===================================================================
+   M3 质感层（Kazumi 式 Material 3 观感）
+   -------------------------------------------------------------------
+   只改「颜色 / 圆角 / 层级面 / 按钮形态」，不动布局、定位、z-index 梯度，
+   避免回归已修好的层叠与居中问题。变量在 :root 覆盖，组件类按名微调。
+   M3 面层级：surface < surface-container < surface-container-high < surface-container-highest
+   =================================================================== */
+
+:root[data-theme='dark'] {
+  /* M3 dark tonal（baseline purple-blue，Kazumi 默认调性） */
+  --bg: #141218;              /* surface */
+  --rail: #1d1b20;            /* surface-container */
+  --card: #211f26;            /* surface-container */
+  --card2: #2b2930;           /* surface-container-high */
+  --line: #36343b;            /* outline-variant */
+  --line2: #4a4850;
+  --fg: #e6e0e9;              /* on-surface */
+  --fg2: #cac4d0;             /* on-surface-variant */
+  --acc: #d0bcff;             /* primary（dark 下是浅色） */
+  --acc2: #b69df8;
+  --acc-soft: #4a4458;        /* primary-container 系 */
+  --ok: #7ddc9a;
+  --warn: #ffb95c;
+  --err: #ffb4ab;
+  --bubble: #2b2930;
+  --m3-primary-container: #4f378b;
+  --m3-on-primary-container: #eaddff;
+  --m3-secondary-container: #4a4458;
+  --m3-on-secondary-container: #e8def8;
+  --m3-surface-highest: #36343b;
+  --shadow: 0 4px 16px rgba(0, 0, 0, .4);
+  --radius: 16px;
+}
+:root[data-theme='light'] {
+  --bg: #fef7ff;
+  --rail: #f3edf7;
+  --card: #f3edf7;
+  --card2: #eae2ec;
+  --line: #cac4d0;
+  --line2: #b8b2bf;
+  --fg: #1d1b20;
+  --fg2: #49454f;
+  --acc: #6750a4;
+  --acc2: #56408f;
+  --acc-soft: #eaddff;
+  --ok: #146c2e;
+  --warn: #7c5800;
+  --err: #b3261e;
+  --bubble: #eae2ec;
+  --m3-primary-container: #eaddff;
+  --m3-on-primary-container: #21005d;
+  --m3-secondary-container: #e8def8;
+  --m3-on-secondary-container: #1d192b;
+  --m3-surface-highest: #e6e0e9;
+  --shadow: 0 2px 10px rgba(60, 40, 90, .12);
+  --radius: 16px;
+}
+
+/* ---------- M3 圆角体系 ---------- */
+button, input, textarea, select { border-radius: 12px; }
+.rail-btn { border-radius: 999px; }                 /* rail 指示 pill */
+.rail-btn.on { background: var(--m3-secondary-container); color: var(--m3-on-secondary-container); }
+.qr-chip { border-radius: 8px; }                     /* assist chip */
+.pend, .mp-cell, .dlg-box, .cf-box, .mp-box, .ied-box { border-radius: 16px; }
+.post-box, .viewer-mask img { border-radius: 12px; }
+.gp { border-radius: 28px 0 0 28px; }                /* 右侧面板大圆角（M3 sheet） */
+.dock { border-radius: 28px; }
+
+/* ---------- M3 按钮形态 ---------- */
+button.ghost {
+  background: transparent; border: 1px solid var(--line); color: var(--fg);
+}
+button.ghost:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+/* 质感层是覆盖层：组件 scoped 的 .on 规则特异性更高，这里用 !important 保证 M3 容器色生效 */
+button.ghost.on, button.ghost.small.on, .bar-row .on, .gp-chips .on {
+  background: var(--m3-secondary-container) !important;
+  border-color: transparent !important;
+  color: var(--m3-on-secondary-container) !important;
+}
+/* 主按钮（filled） */
+.line > button, .dlg-foot .primary, .cf-btn.ok, .up-btn.ok, .gp-row button:not(.ghost) {
+  background: var(--acc); color: var(--bg); border: none; font-weight: 600;
+}
+:root[data-theme='dark'] .line > button,
+:root[data-theme='dark'] .dlg-foot .primary,
+:root[data-theme='dark'] .cf-btn.ok { color: #21005d; }
+.line > button:hover, .dlg-foot .primary:hover, .cf-btn.ok:hover { filter: brightness(1.06); }
+.line > button:disabled { background: var(--m3-surface-highest); color: var(--fg2); }
+
+/* ---------- 气泡 M3 化 ---------- */
+.bubble { border-radius: 18px; background: var(--bubble); }
+.bubble.right { background: var(--m3-primary-container); color: var(--m3-on-primary-container); }
+/* 媒体消息（图 t2 / 表情 t7 / 视频 t10）不要容器底色，否则一大块色板裹着图；文件卡片保留容器色 */
+.bubble.t2, .bubble.t7, .bubble.t10 { background: transparent; }
+.bubble.right.t2, .bubble.right.t7, .bubble.right.t10 { background: transparent; color: var(--fg); }
+
+/* ---------- 卡片面层级 ---------- */
+.k-card, .ab-card, .mp-cell, .fn-chip { background: var(--card); border: 1px solid transparent; }
+.k-card:hover, .mp-cell:hover { background: var(--card2); }
+
+/* ---------- 侧栏会话行（M3 list） ---------- */
+.convs li { border-radius: 24px; margin: 2px 8px; padding: 10px 8px; }
+.convs li.active { background: var(--m3-secondary-container); }
+.convs li.active .cname { color: var(--m3-on-secondary-container); }
+
+/* ---------- 输入区 ---------- */
+.composer { background: var(--rail); border-top: none; }
+.composer textarea {
+  background: var(--card2); border: 1px solid transparent; border-radius: 24px 24px 6px 24px;
+  padding: 12px 16px 38px;
+}
+.composer textarea:focus { border-color: var(--acc); }
+
+/* ---------- 标题栏 ---------- */
+.chat-header { background: var(--rail); border-bottom: none; }
+
+/* ---------- 滚动条 M3 ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 999px; }

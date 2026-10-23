@@ -11,7 +11,7 @@
  *   · 云湖自带群网盘：api.diskList（字段是 qiniuKey，别写 fileUrl）
  *   · 群里的第三方网盘挂载：走 /mount-json 代理，页内浏览（不跳新标签）
  */
-import { inject, computed, ref, watch, nextTick } from 'vue'
+import { inject, computed, ref, reactive, watch, nextTick } from 'vue'
 import { resUrl } from '../core/res'
 import { fallbackAvatar, fmtTime } from '../core/util'
 import { sanitizeHtml, renderRich, postProcess } from '../core/render'
@@ -59,6 +59,111 @@ function mountFileUrl(name: string) {
 function locateFile(name: string) {
   if (g.state.mountView) { g.state.mountHighlight = name; return }
   g.locateFile?.(name)
+}
+
+/** 群网盘重命名（/v1/disk/rename，审计补齐 UI；内联输入框，不用原生 prompt） */
+const renaming = ref<{ id: number; name: string } | null>(null)
+function renameDisk(f: any) { renaming.value = { id: f.id, name: f.name } }
+async function renameDiskOk() {
+  const cur = chat.state.current
+  const rn = renaming.value
+  renaming.value = null
+  if (!cur || !rn || !rn.name.trim()) return
+  try {
+    await ctx.api.diskRename(cur.id, cur.type, rn.id, rn.name.trim())
+    ctx.ui?.toast?.('已重命名', 'success')
+    g.loadDisk()
+  } catch (e: any) { ctx.ui?.toast?.('重命名失败：' + e.message, 'error') }
+}
+
+/** 群网盘删除（/v1/disk/remove） */
+async function delDisk(f: any) {
+  if (!(await ctx.ui?.confirm?.('删除文件', `确定删除「${f.name}」？`, { danger: true }))) return
+  try {
+    await ctx.api.diskDelete(f.id)
+    ctx.ui?.toast?.('已删除', 'success')
+    g.loadDisk()
+  } catch (e: any) { ctx.ui?.toast?.('删除失败：' + e.message, 'error') }
+}
+
+/* ---- 群管理补齐：设/撤管理员（/v1/group/manage-setting，仅群主） ---- */
+const isOwner = computed(() => {
+  const me = ctx.auth?.state?.user?.id
+  const info = g.state.info
+  return !!me && (info?.owner === me || info?.createBy === me)
+})
+async function setAdmin(m: any) {
+  const gid = chat.state.current?.id
+  if (!gid) return
+  const next = m.level >= 2 ? 0 : 2
+  try {
+    await ctx.api.setManageSetting(gid, m.id, next)
+    ctx.ui?.toast?.(next === 2 ? `已设 ${m.name} 为管理员` : `已撤销 ${m.name} 的管理员`, 'success')
+    m.level = next
+  } catch (e: any) { ctx.ui?.toast?.('设置失败：' + e.message, 'error') }
+}
+
+/* ---- 群主管理：编辑群资料 / 消息自动删除 / 入群口令 ---- */
+const gEdit = reactive({ name: '', intro: '', autoDel: 0, keyword: '' })
+watch(() => g.state.info, (info) => {
+  if (!info) return
+  gEdit.name = info.name || ''
+  gEdit.intro = info.introduction || ''
+  gEdit.autoDel = info.autoDeleteMessage || 0
+}, { immediate: true })
+async function saveGroupEdit() {
+  const gid = chat.state.current?.id
+  if (!gid) return
+  try {
+    await ctx.api.editGroup(gid, { name: gEdit.name.trim(), introduction: gEdit.intro.trim() })
+    ctx.ui?.toast?.('群资料已保存', 'success')
+    g.loadInfo()
+  } catch (e: any) { ctx.ui?.toast?.('保存失败：' + e.message, 'error') }
+}
+async function saveAutoDel() {
+  const gid = chat.state.current?.id
+  if (!gid) return
+  try {
+    await ctx.api.editAutoDeleteMessage(gid, gEdit.autoDel)
+    ctx.ui?.toast?.('自动删除设置已保存', 'success')
+  } catch (e: any) { ctx.ui?.toast?.('保存失败：' + e.message, 'error') }
+}
+async function saveKeyword() {
+  const gid = chat.state.current?.id
+  if (!gid) return
+  try {
+    await ctx.api.editGroupKeyword(gid, gEdit.keyword.trim())
+    ctx.ui?.toast?.('群口令已保存', 'success')
+  } catch (e: any) { ctx.ui?.toast?.('保存失败：' + e.message, 'error') }
+}
+
+/* ---- 第三方网盘挂载增删（mount-setting create/delete，审计补齐 UI） ---- */
+const mountForm = ref(false)
+const mfBusy = ref(false)
+const mf = ref({ name: '', url: '', user: '', pass: '', root: '' })
+async function addMount() {
+  const cur = chat.state.current
+  if (!cur || mfBusy.value) return
+  mfBusy.value = true
+  try {
+    await ctx.api.mountCreate(cur.id, {
+      name: mf.value.name.trim(), url: mf.value.url.trim(),
+      user: mf.value.user.trim(), pass: mf.value.pass, root: mf.value.root.trim(),
+    })
+    ctx.ui?.toast?.('挂载已添加', 'success')
+    mf.value = { name: '', url: '', user: '', pass: '', root: '' }
+    mountForm.value = false
+    g.loadDisk()
+  } catch (e: any) { ctx.ui?.toast?.('添加失败：' + e.message, 'error') }
+  finally { mfBusy.value = false }
+}
+async function delMount(m: any) {
+  if (!(await ctx.ui?.confirm?.('删除挂载', `确定删除挂载「${m.name}」？`, { danger: true }))) return
+  try {
+    await ctx.api.mountDelete(m.id)
+    ctx.ui?.toast?.('挂载已删除', 'success')
+    g.loadDisk()
+  } catch (e: any) { ctx.ui?.toast?.('删除失败：' + e.message, 'error') }
 }
 
 /**
@@ -200,6 +305,8 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
               <option v-for="o in g.GAG_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
             <button v-if="g.state.tags.length" class="ghost small" @click="g.setDockTab('tags'); g.openTagMember(m)">标签</button>
+            <button v-if="isOwner && m.level < 100" class="ghost small" :title="m.level >= 2 ? '取消管理员' : '设为管理员'"
+                    @click="setAdmin(m)">{{ m.level >= 2 ? '撤管理' : '设管理' }}</button>
             <button class="ghost small danger" @click="g.kick(m)">踢出</button>
           </li>
           <li v-if="!g.state.members.length" class="dim center">
@@ -244,6 +351,26 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
             <div class="kv"><span class="k">群主</span><span>{{ g.state.info.createBy || '—' }}</span></div>
             <div class="kv"><span class="k">创建时间</span><span class="dim">云湖接口不返回该字段</span></div>
           </div>
+          <!-- 群主管理区（审计补齐：编辑群资料/自动删除/群口令） -->
+          <template v-if="isOwner">
+            <div class="ginfo-sec">群主管理</div>
+            <div class="ginfo-row">
+              <input v-model="gEdit.name" placeholder="群名称" />
+              <input v-model="gEdit.intro" placeholder="群公告/简介" />
+              <button class="ghost small" @click="saveGroupEdit">保存群资料</button>
+            </div>
+            <div class="ginfo-row">
+              <select v-model.number="gEdit.autoDel">
+                <option :value="0">不自动删除消息</option>
+                <option :value="3600">1 小时后删除</option>
+                <option :value="86400">1 天后删除</option>
+                <option :value="604800">7 天后删除</option>
+              </select>
+              <button class="ghost small" @click="saveAutoDel">保存</button>
+              <input v-model="gEdit.keyword" placeholder="入群口令（可空）" />
+              <button class="ghost small" @click="saveKeyword">保存口令</button>
+            </div>
+          </template>
           <p class="dim small">接口：/v1/group/info（GroupInfoRequest{group_id=2}）</p>
         </div>
         <div v-else class="dim center">没拿到群信息</div>
@@ -279,8 +406,20 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
           <button class="ghost small" @click="g.loadDisk()">刷新</button>
         </div>
         <!-- 群里的第三方网盘挂载（比如 123云盘 WebDAV）——不在 file-list 里，要单独列 -->
-        <div v-if="g.state.mounts.length" class="mounts">
-          <div class="m-head">第三方网盘挂载（WebDAV）· {{ g.state.mounts.length }} 个</div>
+        <div class="mounts">
+          <div class="m-head">
+            第三方网盘挂载（WebDAV）· {{ g.state.mounts.length }} 个
+            <span class="grow"></span>
+            <button class="ghost small" @click="mountForm = !mountForm">{{ mountForm ? '收起' : '+ 添加挂载' }}</button>
+          </div>
+          <div v-if="mountForm" class="m-form">
+            <input v-model="mf.name" placeholder="名称" />
+            <input v-model="mf.url" placeholder="WebDAV 地址 https://…" />
+            <input v-model="mf.user" placeholder="账号（可空）" />
+            <input v-model="mf.pass" type="password" placeholder="密码（可空）" />
+            <input v-model="mf.root" placeholder="根路径（可空，如 /dav）" />
+            <button class="ghost small" :disabled="mfBusy || !mf.name.trim() || !mf.url.trim()" @click="addMount">保存</button>
+          </div>
           <div v-for="m in g.state.mounts" :key="m.id" class="m-item">
             <span class="d-ico"><Icon name="link" :size="15" /></span>
             <b>{{ m.name }}</b>
@@ -288,7 +427,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
             <span class="grow"></span>
             <!-- 走本站 WebDAV 网关：浏览器直接得到可点的目录页（不用手输账号密码） -->
             <button class="small" @click="openMount(m)">浏览</button>
-            <a class="ghost small" :href="m.url" target="_blank" rel="noreferrer" title="原始地址（需自行认证）">原始</a>
+            <button class="ghost small icon-btn" title="删除挂载" @click="delMount(m)"><Icon name="trash" :size="13" /></button>
           </div>
         </div>
 
@@ -328,10 +467,16 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
           <li v-for="f in g.state.diskList" :key="f.id" :class="{ hit: g.locateHighlight?.name && f.name === g.locateHighlight.name }"
               @dblclick="f.isFolder && g.openFolder(f)">
             <span class="d-ico"><Icon :name="f.isFolder ? 'folder' : 'page'" :size="15" /></span>
-            <span class="d-name" @click="f.isFolder && g.openFolder(f)">{{ f.name }}</span>
+            <template v-if="renaming?.id === f.id">
+              <input v-model="renaming.name" class="disk-rename" @keyup.enter="renameDiskOk" @keyup.esc="renaming = null" />
+              <button class="ghost small" @click="renameDiskOk">确定</button>
+            </template>
+            <span v-else class="d-name" @click="f.isFolder && g.openFolder(f)">{{ f.name }}</span>
             <span class="dim small">{{ f.isFolder ? '' : (f.fileSize ? (f.fileSize / 1024).toFixed(1) + ' KB' : '') }}</span>
             <span class="grow"></span>
             <span class="dim small">{{ fmtTime(f.uploadTime) }}</span>
+            <button class="ghost small icon-btn" title="重命名" @click="renameDisk(f)"><Icon name="pencil" :size="13" /></button>
+            <button class="ghost small icon-btn" title="删除" @click="delDisk(f)"><Icon name="trash" :size="13" /></button>
             <a v-if="!f.isFolder && f.fileUrl" class="ghost small" :href="resUrl(f.fileUrl)" target="_blank" rel="noreferrer" :download="f.name">下载</a>
           </li>
           <li v-if="!g.state.diskList.length" class="dim center">
@@ -498,6 +643,12 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 .ginfo-top img { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; background: var(--card2); }
 .ginfo-name { font-size: 16px; font-weight: 600; }
 .ginfo-grid { display: flex; flex-direction: column; gap: 2px; }
+.ginfo-sec { font-size: 12px; color: var(--fg2); margin: 12px 0 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ginfo-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.ginfo-row input, .ginfo-row select {
+  flex: 1; min-width: 90px; background: var(--card2); border: 1px solid var(--line);
+  border-radius: 8px; color: var(--fg); padding: 6px 9px; font-size: 12.5px; outline: none;
+}
 .wd-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; background: var(--card2); }
 .wd-bar code { font-size: 12px; background: var(--card); padding: 2px 6px; border-radius: 5px; }
 .mount-browse { margin-bottom: 14px; }
@@ -505,9 +656,19 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 .mb-head .grow { flex: 1; }
 .mb-pwd { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card2); }
 .mounts { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.m-head { font-size: 12.5px; color: var(--fg2); margin-bottom: 6px; }
+.m-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg2); margin-bottom: 6px; }
+.m-head .grow { flex: 1; }
+.m-form { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.m-form input {
+  background: var(--card2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--fg); padding: 6px 10px; font-size: 12.5px; outline: none;
+}
 .m-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
 .m-item .grow { flex: 1; }
+.disk-rename {
+  flex: 1; min-width: 0; background: var(--card2); border: 1px solid var(--acc);
+  border-radius: 7px; color: var(--fg); padding: 4px 8px; font-size: 13px; outline: none;
+}
 .disk-list { list-style: none; margin: 0; padding: 0; }
 .disk-list li { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .disk-list li.hit { background: var(--acc-soft, var(--card2)); outline: 1px solid var(--acc); border-radius: 6px; }

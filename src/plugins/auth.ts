@@ -81,10 +81,13 @@ export const authPlugin = {
        * 保留非凭据偏好（主题/壁纸/快捷回复等）。
        */
       async logout() {
+        const dev = deviceId
         api.setToken('')
         state.user = null
         state.status = 'guest'
         deviceId = ''
+        // 通知云端注销本设备（失败不阻塞本地登出）
+        if (dev) api.logoutDevice?.(dev)
         localStorage.removeItem('yh.token')
         localStorage.removeItem('yh.device')
         localStorage.removeItem('yh.data.session')

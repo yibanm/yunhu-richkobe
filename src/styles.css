@@ -275,8 +275,22 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .dlg-input:focus { border-color: var(--acc); }
 .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .dlg-foot .primary { background: var(--acc); color: #fff; border-color: transparent; }
-.search { padding: 10px 12px; }
+.search { padding: 10px 12px; position: relative; }
 .search input { width: 100%; }
+/* 全局搜索结果浮层 */
+.gs-pop {
+  position: absolute; left: 10px; right: 10px; top: 100%; z-index: 70;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 4px; max-height: 300px; overflow: auto;
+}
+.gs-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 6px 8px; border: none; border-radius: 8px; background: none;
+  color: var(--fg); font-size: 13px; cursor: pointer;
+}
+.gs-item:hover { background: var(--card2); }
+.gs-item img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--card2); }
+.gs-item em { margin-left: auto; font-style: normal; }
 /* ============ 会话列表（这次做减法：少颜色、靠重量和间距分层） ============ */
 .convs { list-style: none; margin: 0; padding: 2px 6px 12px; overflow-y: auto; flex: 1; }
 .convs li {

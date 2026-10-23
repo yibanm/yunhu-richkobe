@@ -3,6 +3,7 @@ import App from './App.vue'
 import { ctx, bootstrap } from './app'
 import { platform, applyPlatformAttr, enableRipple } from './platform'
 import './styles.css'
+import './styles-m3.css'   // M3 质感层（Kazumi 式观感），必须后加载覆盖基础变量
 
 applyPlatformAttr(platform)
 enableRipple()

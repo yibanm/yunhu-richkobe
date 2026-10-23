@@ -125,6 +125,18 @@ async function openPost(el: any) {
 }
 function closePost() { postView.value = null }
 
+/** 消息内按钮点击 → /v1/msg/button-report 回报（审计补齐死路径） */
+async function onMsgButton(el: any) {
+  const m = props.msg
+  if (!m) return
+  try {
+    await ctx.api.buttonReport({
+      chatId: m.chatId, chatType: m.chatType || ctx.chat?.state?.current?.type || 1,
+      msgId: m.id, buttonId: el.attrs.id || '', value: el.attrs.value || el.attrs.text || '',
+    })
+  } catch { /* 回报失败不打断用户 */ }
+}
+
 async function fix() { await nextTick(); postProcess(body.value) }
 onMounted(fix)
 watch(() => props.elements, fix, { deep: true })
@@ -187,6 +199,8 @@ watch(() => props.elements, fix, { deep: true })
       </a>
 
       <!-- 云湖扩展 -->
+      <button v-else-if="el.type === 'button'" class="msg-btn"
+              @click="onMsgButton(el)">{{ el.attrs.text || el.attrs.content || '按钮' }}</button>
       <span v-else-if="el.type === 'tip'" class="tip">{{ el.attrs.content }}</span>
       <span v-else-if="el.type === 'call'" class="tip">📞 {{ el.attrs.content || '语音通话' }}</span>
       <!-- 文章卡片：点击在页内打开正文（之前是死链接 @click.prevent 无处理 → 「点不开」） -->
