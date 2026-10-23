@@ -14,7 +14,6 @@
  */
 import { reactive } from 'vue'
 import LockScreen from '../console/components/LockScreen.vue'
-import UnlockPrompt from '../console/components/UnlockPrompt.vue'
 
 const REQ_TTL = 5 * 60 * 1000
 
@@ -148,42 +147,16 @@ export const lockPlugin = {
       }, 2000)
     }
 
-    /* ---- 手机端：未锁定时轮询解锁请求并弹窗 ---- */
-    let mobTimer: any = null
-    const answered = new Set<string>()
-    function watchMobile() {
-      clearInterval(mobTimer)
-      mobTimer = setInterval(async () => {
-        if (state.locked || auth.state.status !== 'ready') return
-        const r = await relay().catch(() => ({}))
-        const req = r.lockreq
-        if (!req || Date.now() - req.ts > REQ_TTL) { state.pending = null; return }
-        if (req.device === (auth.deviceId || 'desktop')) return          // 自己发的不理
-        if (answered.has(req.nonce) || r.lockres?.nonce === req.nonce) return
-        state.pending = req
-      }, 3000)
-    }
-
-    /** 手机端：同意/拒绝解锁请求 */
-    async function answerRemote(approved: boolean) {
-      const req = state.pending
-      if (!req) return
-      answered.add(req.nonce)
-      state.pending = null
-      await putRelay({ lockres: { nonce: req.nonce, approved, ts: Date.now() } })
-    }
-
     ctx.effect(() => {
       restore()
       watchDesk()
-      watchMobile()
-      return () => { clearInterval(deskTimer); clearInterval(mobTimer) }
+      return () => { clearInterval(deskTimer) }
     })
 
     ctx.on('app/lock', () => lock())
 
     const lockApi = {
-      state, lock, unlock, checkPin, setPin, clearPin, requestRemoteUnlock, answerRemote,
+      state, lock, unlock, checkPin, setPin, clearPin, requestRemoteUnlock,
       get isLocked() { return state.locked },
     }
     ctx.set('lock', lockApi)
@@ -192,7 +165,6 @@ export const lockPlugin = {
     ctx.inject(['console'], (c) => {
       c.console.addEntry((cc) => {
         cc.slot({ type: 'global', component: LockScreen, order: 900 })
-        cc.slot({ type: 'global', component: UnlockPrompt, order: 901 })
       })
     })
   },
