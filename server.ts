@@ -352,17 +352,17 @@ async function handleFileDir(req: http.IncomingMessage, res: http.ServerResponse
 }
 
 /**
- * POST /local-open {url, name} —— 「在文件夹中打开」/「保存文件」：
+ * GET /local-open?url= * POST /local-open {url, name} —— name= —— 「在文件夹中打开」/「保存文件」：
  * 把远程文件下载到**文件保存目录**（默认 文档/yhchat/file，可自定义），
  * 然后调系统资源管理器定位选中（Windows: explorer /select,xxx；其它平台打开目录）。
  * url 限本站 /res 代理或云湖数据床域名，防任意下载。
  */
-async function handleLocalOpen(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-  if (req.method !== 'POST') { res.writeHead(405, JSON_HDR).end(JSON.stringify({ ok: false })); return }
+async function handleLocalOpen(req: http.IncomingMessage, res: http.ServerResponse, search: string): Promise<void> {
+  if (req.method !== 'GET') { res.writeHead(405, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'use GET with ?url=&name=' })); return }
+  const q0 = new URLSearchParams(search || '')
   try {
-    const body = JSON.parse(await readBody(req))
-    const url = String(body.url || '')
-    const name = String(body.name || '').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120) || 'file'
+    const url = String(q0.get('url') || '')
+    const name = String(q0.get('name') || '').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120) || 'file'
     const u = new URL(url, 'http://localhost')
     const allowed = u.pathname.startsWith('/res/') || RES_HOST_RE.test(u.hostname) || u.hostname === 'localhost' || u.hostname === '127.0.0.1'
     if (!allowed) { res.writeHead(403, JSON_HDR).end(JSON.stringify({ ok: false, msg: 'url not allowed' })); return }
@@ -444,7 +444,7 @@ function serverApp(req: any, res: any) {
   if (dataM) { handleData(req, res, dataM[1]); return }
   if (pathname === '/data-dir') { handleDataDir(req, res).catch(e => { res.writeHead(500, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
   if (pathname === '/update-check' && req.method === 'GET') { handleUpdateCheck(res).catch(e => { res.writeHead(502, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
-  if (pathname === '/local-open' && req.method === 'POST') { handleLocalOpen(req, res).catch(e => { res.writeHead(500, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
+  if (pathname === '/local-open' && req.method === 'GET') { handleLocalOpen(req, res, search).catch(e => { res.writeHead(500, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
   if (pathname === '/file-dir') { handleFileDir(req, res).catch(e => { res.writeHead(500, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
   if (pathname === '/local-read' && req.method === 'GET') { handleLocalRead(req, res, search).catch(e => { res.writeHead(500, JSON_HDR).end(JSON.stringify({ ok: false, msg: e.message })) }); return }
   // 标准 Satori 协议端点

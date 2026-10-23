@@ -837,11 +837,11 @@ export const apiPlugin = {
        */
       async uploadFile(file: File, kind: 'image' | 'file' | 'audio' | 'video' | 'sticker' = 'image',
         onProgress?: (loaded: number, total: number) => void) {
-        // 官方上传大小限制（超出直接提示，不发起上传）
-        const LIMITS: Record<string, number> = { image: 20 * 1024 * 1024, video: 100 * 1024 * 1024, audio: 50 * 1024 * 1024, file: 100 * 1024 * 1024, sticker: 50 * 1024 * 1024 }
-        const lim = LIMITS[kind] || 100 * 1024 * 1024
+        // 官方上传大小限制：用户定死 40MB 上限（所有类型统一，超出直接拒绝不浪费流量）
+        const LIMITS: Record<string, number> = { image: 40 * 1024 * 1024, video: 40 * 1024 * 1024, audio: 40 * 1024 * 1024, file: 40 * 1024 * 1024, sticker: 40 * 1024 * 1024 }
+        const lim = LIMITS[kind] || 40 * 1024 * 1024
         if (file.size > lim) {
-          throw new Error(`文件超过${Math.round(lim / 1024 / 1024)}MB 上传限制（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）`)
+          throw new Error(`文件超过 40MB 上传限制（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）`)
         }
         const token = await api.uploadToken(kind)
         const seg = token.split(':')

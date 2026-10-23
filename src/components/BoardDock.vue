@@ -242,6 +242,8 @@ async function uploadDisk(e: any) {
   diskUploading.value = true
   let ok = 0
   for (const f of fs) {
+    // 40MB 上限（与聊天上传一致）
+    if (f.size > 40 * 1024 * 1024) { ctx.ui?.toast?.(`「${f.name}」超过 40MB 限制`, 'error'); continue }
     const path = [...g.state.diskPath.map((p: any) => p.name), f.name].map(encodeURIComponent).join('/')
     try {
       const r = await fetch(`/webdav/${gid}/${path}`, {

@@ -174,23 +174,34 @@ async function onMsgButton(el: any) {
 }
 
 /**
- * 保存文件：下载到用户文件目录（默认 文档/yhchat/file，关于页可自定义）
- * 并在系统资源管理器中定位选中。WebView2/Electron 里 <a download> 跨域不生效，
- * 统一走 server 端下载，行为在所有壳里一致。
+ * 保存文件：优先系统「另存为」对话框（showSaveFilePicker，用户自己选目录、保留原文件名）；
+ * 不支持时回退 server /local-open（GET，下载到文件保存目录并弹资源管理器）。
+ * ⚠️ /local-open 只注册了 GET：POST 会落 SPA fallback 回 index.html（200 非 JSON）→ 旧版报「HTTP 200」失败。
  */
 async function saveFile(el: any) {
   const url = mediaUrl(el.attrs.src, 'file')
-  const name = el.attrs.name || url.split('/').pop() || '文件'
+  const name = el.attrs.name || decodeURIComponent(url.split('/').pop() || 'file')
   try {
-    ctx.ui?.toast?.('保存中…', 'info')
-    const r = await fetch('/local-open', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url, name }),
-    })
-    const j = await r.json().catch(() => null)
-    if (!j?.ok) throw new Error(j?.msg || ('HTTP ' + r.status))
-    ctx.ui?.toast?.('已保存并在资源管理器中打开', 'success')
+    ctx.ui?.toast?.('准备保存…', 'info')
+    const r = await fetch(url)
+    if (!r.ok) throw new Error('下载失败 HTTP ' + r.status)
+    const blob = await r.blob()
+    const w = window as any
+    if (w.showSaveFilePicker) {
+      const handle = await w.showSaveFilePicker({ suggestedName: name })
+      const ws = await handle.createWritable()
+      await ws.write(blob)
+      await ws.close()
+      ctx.ui?.toast?.('已保存', 'success')
+      return
+    }
+    // 回退：server 端下载到文件目录 + 资源管理器定位（GET！）
+    const r2 = await fetch('/local-open?url=' + encodeURIComponent(url) + '&name=' + encodeURIComponent(name))
+    const j = await r2.json().catch(() => null)
+    if (!j?.ok) throw new Error(j?.msg || ('HTTP ' + r2.status))
+    ctx.ui?.toast?.('已保存到文件目录并在资源管理器中打开', 'success')
   } catch (e: any) {
+    if (e?.name === 'AbortError') return   // 用户取消另存为
     ctx.ui?.toast?.('保存失败：' + e.message, 'error')
   }
 }
