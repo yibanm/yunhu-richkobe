@@ -445,6 +445,9 @@ export const chatPlugin = {
         if (added) {
           state.messages.sort((a: any, b: any) => a.ts - b.ts)
           if (state.messages.length > maxMessages) state.messages.splice(0, state.messages.length - maxMessages)
+          // 清除乐观上屏的 pending 消息：其 id 是客户端生成的，与服务端 id 不同，
+          // 增量合并按 id 去重会两条都留 → 用户看到「消息重复」。服务端版本已在列表里。
+          state.messages = state.messages.filter((m: any) => !m.pending)
           if (!silent && atBottom()) ctx.emit('chat/scroll-bottom')
         } else if (!silent) {
           ctx.emit('chat/scroll-bottom')
