@@ -77,6 +77,29 @@ export const authPlugin = {
       },
 
       /**
+       * 只验证 token 有效性、**不改动当前登录态**（锁屏忘记密码等场景用）。
+       * 失败抛错但原 token/状态原样恢复，不会把已登录的会话踢回登录页。
+       */
+      async verifyToken(token: string) {
+        const prev = api.token
+        const prevStatus = state.status
+        const prevUser = state.user
+        api.setToken(token.trim())
+        try {
+          const user = await api.self()
+          return user
+        } catch (e) {
+          // 恢复原会话，绝不把用户踢回登录页
+          api.setToken(prev || '')
+          state.status = prevStatus
+          state.user = prevUser
+          throw e
+        } finally {
+          if (prev) { api.setToken(prev); state.status = prevStatus; state.user = prevUser }
+        }
+      },
+
+      /**
        * 退出账号：清除本地**全部凭据**（token/设备号/PIN/锁态/会话缓存/扫码中继），
        * 保留非凭据偏好（主题/壁纸/快捷回复等）。
        */
