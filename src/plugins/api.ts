@@ -657,6 +657,7 @@ export const apiPlugin = {
           uploadByName: x.uploadByName || x.uploadBy || '',
           fileUrl: x.qiniuKey || '',
           parentId: x.parentFolderId ?? x.folderId ?? 0,
+          objectType: x.objectType ?? (x.objectType === 1 ? 1 : 2),
         }))
       },
 
@@ -1008,8 +1009,9 @@ export const apiPlugin = {
         return assertOk(await request('/v1/sticker/sort', { body: { sort: items } }))
       },
       /** 群网盘重命名 */
-      async diskRename(chatId: string, chatType: number, fileId: number, newName: string) {
-        return assertOk(await request('/v1/disk/rename', { body: { chatId, chatType, fileId, newName } }))
+      /** 群盘重命名：官方请求体 { id, objectType, name }（此前字段全错导致接口报错） */
+      async diskRename(fileId: number, objectType: number, name: string) {
+        return assertOk(await request('/v1/disk/rename', { body: { id: fileId, objectType, name } }))
       },
       /** 「发现」页：推荐分区列表 */
       async recommendCategories() {

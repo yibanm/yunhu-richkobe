@@ -100,7 +100,7 @@ async function checkUpdate() {
     const r = await fetch('/update-check')
     if (!r.ok) { ui?.toast?.('暂时无法检查更新（服务未就绪）', 'warn'); return }
     const j = await r.json()
-    const cur = ctx.app?.version || '1.0.0'
+    const cur = ctx.app?.version || '1.0.3'
     if (!j.ok) { ui?.toast?.('暂时无法检查更新（' + (j.msg || '网络') + '）', 'warn'); return }
     const tag = String(j.tag || '').replace(/^v/, '')
     // semver 比较：只有远端**更高**才提示新版本（相同/更低都算最新）

@@ -182,11 +182,11 @@ async function dlgOk() {
       <div class="dlg-box">
         <div class="dlg-title">{{ dlg.kind === 'group' ? '创建群聊' : '加好友' }}</div>
         <template v-if="dlg.kind === 'group'">
-          <input v-model="dlg.name" class="dlg-input" placeholder="群名称" maxlength="30" />
+          <input v-model="dlg.name" class="dlg-input" placeholder="群名称" maxlength="30" autofocus />
           <textarea v-model="dlg.intro" class="dlg-input" placeholder="群简介（可选）" rows="3"></textarea>
         </template>
         <template v-else>
-          <input v-model="dlg.fid" class="dlg-input" placeholder="对方 ID" />
+          <input v-model="dlg.fid" class="dlg-input" placeholder="对方 ID" autofocus />
           <textarea v-model="dlg.msg" class="dlg-input" placeholder="验证消息（可选）" rows="2"></textarea>
         </template>
         <div class="dlg-foot">

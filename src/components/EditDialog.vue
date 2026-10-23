@@ -45,7 +45,7 @@ async function save() {
         <span>编辑消息</span>
         <button class="ed-x" title="关闭" @click="close">×</button>
       </div>
-      <textarea v-model="text" class="ed-ta" rows="5" placeholder="消息内容"></textarea>
+      <textarea v-model="text" class="ed-ta" rows="5" placeholder="消息内容" autofocus ref="edTa"></textarea>
       <div class="ed-foot">
         <button class="ghost tiny" @click="close">取消</button>
         <button class="ed-ok tiny" :disabled="busy || !text.trim()" @click="save">{{ busy ? '保存中…' : '保存' }}</button>

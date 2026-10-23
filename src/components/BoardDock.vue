@@ -62,15 +62,14 @@ function locateFile(name: string) {
 }
 
 /** 群网盘重命名（/v1/disk/rename，审计补齐 UI；内联输入框，不用原生 prompt） */
-const renaming = ref<{ id: number; name: string } | null>(null)
-function renameDisk(f: any) { renaming.value = { id: f.id, name: f.name } }
+const renaming = ref<{ id: number; name: string; objectType?: number } | null>(null)
+function renameDisk(f: any) { renaming.value = { id: f.id, name: f.name, objectType: f.objectType ?? 2 } }
 async function renameDiskOk() {
-  const cur = chat.state.current
   const rn = renaming.value
   renaming.value = null
-  if (!cur || !rn || !rn.name.trim()) return
+  if (!rn || !rn.name.trim()) return
   try {
-    await ctx.api.diskRename(cur.id, cur.type, rn.id, rn.name.trim())
+    await ctx.api.diskRename(rn.id, rn.objectType ?? 2, rn.name.trim())
     ctx.ui?.toast?.('已重命名', 'success')
     g.loadDisk()
   } catch (e: any) { ctx.ui?.toast?.('重命名失败：' + e.message, 'error') }
@@ -356,10 +355,13 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
             <div class="mm-wrap">
               <button class="ghost small" @click.stop="openMemberMgmt(m, $event)">管理</button>
               <div v-if="mgmt?.id === m.id" class="mm-pop" @click.stop>
-                <select class="gag-sel" @change="(e: any) => { if (e.target.value !== '') { g.gag(m, Number(e.target.value)); e.target.value = ''; mgmt = null } }">
-                  <option value="">{{ m.isGag ? '解除禁言…' : '禁言…' }}</option>
-                  <option v-for="o in g.GAG_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-                </select>
+                <!-- 禁言：按钮列表小弹窗（不用原生下拉） -->
+                <div class="mm-sec">禁言时长</div>
+                <div class="mm-chips">
+                  <button v-for="o in g.GAG_OPTIONS" :key="o.value" class="ghost small"
+                          :class="{ on: m.isGag && o.value !== 0 }"
+                          @click="g.gag(m, o.value); mgmt = null">{{ o.label }}</button>
+                </div>
                 <button v-if="isOwner && m.level < 100" class="ghost small" @click="setAdmin(m); mgmt = null">
                   {{ m.level >= 2 ? '取消管理员' : '设为管理员' }}
                 </button>
@@ -528,7 +530,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
               @dblclick="f.isFolder && g.openFolder(f)">
             <span class="d-ico"><Icon :name="f.isFolder ? 'folder' : 'page'" :size="15" /></span>
             <template v-if="renaming?.id === f.id">
-              <input v-model="renaming.name" class="disk-rename" @keyup.enter="renameDiskOk" @keyup.esc="renaming = null" />
+              <input v-model="renaming.name" class="disk-rename" @keyup.enter="renameDiskOk" @keyup.esc="renaming = null" autofocus />
               <button class="ghost small" @click="renameDiskOk">确定</button>
             </template>
             <span v-else class="d-name" @click="f.isFolder && g.openFolder(f)">{{ f.name }}</span>
@@ -647,7 +649,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 .dock-head .owner { display: inline-flex; align-items: center; gap: 4px; color: var(--fg2); }
 .dock-head .owner img { width: 16px; height: 16px; border-radius: 50%; }
 .bot-sel { font-size: 12px; padding: 3px 6px; max-width: 170px; }
-.dock-body { flex: 1; overflow: auto; padding: 14px 18px; background: var(--card); }
+.dock-body { flex: 1; min-height: 320px; overflow: auto; padding: 14px 18px; background: var(--card); }
 .dock-body .rich :deep(img) { max-width: 100%; border-radius: 8px; }
 .dock-body .rich :deep(a) { color: var(--acc); }
 .dock-body .rich :deep(h1), .dock-body .rich :deep(h2), .dock-body .rich :deep(h3) { margin: 6px 0; }
@@ -711,6 +713,16 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
   box-shadow: var(--shadow);
 }
 .mm-pop .gag-sel { width: 100%; }
+/* 上传文件 label 按钮：补边框（label 不吃 button 样式） */
+label.file, .dock label.ghost {
+  display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+  padding: 5px 11px; font-size: 12.5px; border-radius: 12px;
+  border: 1px solid var(--line); background: transparent; color: var(--fg);
+}
+label.file:hover, .dock label.ghost:hover { background: var(--card2); }
+/* 禁言按钮列表 */
+.mm-sec { font-size: 11px; color: var(--fg2); }
+.mm-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .gp-results .r-text { white-space: pre-wrap; word-break: break-word; }
 .ginfo-grid { display: flex; flex-direction: column; gap: 2px; }
 .ginfo-sec { font-size: 12px; color: var(--fg2); margin: 12px 0 6px; border-top: 1px solid var(--line); padding-top: 10px; }

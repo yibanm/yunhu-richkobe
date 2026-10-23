@@ -40,6 +40,61 @@ async function addIntoPack(packId: number, ev: any) {
   await st.addFileToTarget?.(f, packId)
 }
 
+/** 完整文件名（含后缀）：优先 name，回退 url 末段 */
+function fullName(e: any): string {
+  if (e.name) return e.name
+  const u = String(e.urlOriginal || e.url || '')
+  return u.split('/').pop() || String(e.id)
+}
+
+/* ---- 批量重命名（PowerRename 式：多选 → 模式 {n}=序号 / 正则替换） ---- */
+const batchMode = ref(false)
+const batchSel = ref<Set<number>>(new Set())
+const batchDlg = ref(false)
+const batchPattern = ref('表情_{n}')
+const batchStart = ref(1)
+const batchRegexFrom = ref('')
+const batchRegexTo = ref('')
+const batchBusy = ref(false)
+const batchPreview = computed(() => {
+  const pack = (s.packs || []).find((p: any) => p.id === openPack.value)
+  if (!pack) return [] as Array<{ id: number; from: string; to: string }>
+  const ids = [...batchSel.value]
+  return ids.map((id, i) => {
+    const it = (pack.items || []).find((x: any) => x.id === id)
+    return { id, from: it?.name || fullName(it || { id }), to: applyPattern(batchPattern.value, batchStart.value + i, it?.name || '') }
+  })
+})
+/** 模式应用：{n}=序号；若填了正则则先对原名做 replace */
+function applyPattern(pattern: string, n: number, orig: string): string {
+  let out = pattern.replace(/\{n\}/g, String(n))
+  if (batchRegexFrom.value) {
+    try { out = out.replace(new RegExp(batchRegexFrom.value, 'g'), batchRegexTo.value) } catch { /* 正则非法则跳过 */ }
+  }
+  return out || orig
+}
+function toggleBatchSel(id: number) {
+  const s2 = new Set(batchSel.value)
+  if (s2.has(id)) s2.delete(id)
+  else s2.add(id)
+  batchSel.value = s2
+}
+async function applyBatchRename() {
+  const pack = (s.packs || []).find((p: any) => p.id === openPack.value)
+  if (!pack || !batchSel.value.size || batchBusy.value) return
+  batchBusy.value = true
+  let ok = 0
+  for (const row of batchPreview.value) {
+    try { await ctx.api.stickerRenameSticker(row.id, row.to); ok++ } catch { /* 单条失败继续 */ }
+  }
+  batchBusy.value = false
+  batchDlg.value = false
+  batchMode.value = false
+  batchSel.value = new Set()
+  ctx.ui?.toast?.(`已重命名 ${ok} 张`, ok ? 'success' : 'error')
+  await st.loadPacks()
+}
+
 async function importZip(ev: any) {
   const f = ev?.target?.files?.[0]
   if (!f) return
@@ -86,7 +141,7 @@ async function confirmZipImport() {
         </label>
         <!-- zip 导入命名（内联，不用原生 prompt） -->
         <template v-if="pendingZip">
-          <input v-model="zipName" placeholder="表情包名称" style="max-width: 160px" />
+          <input v-model="zipName" placeholder="表情包名称" style="max-width: 160px" autofocus />
           <button class="small" :disabled="zipBusy || !zipName.trim()" @click="confirmZipImport">{{ zipBusy ? '导入中…' : '确认导入' }}</button>
           <button class="ghost small" @click="pendingZip = null">取消</button>
         </template>
@@ -114,15 +169,23 @@ async function confirmZipImport() {
           <div v-if="openPack === p.id" class="pack-open" @click.stop>
             <div class="po-bar">
               <span class="dim small">合集内容 · {{ p.items.length }} 张</span>
+              <button class="ghost small" :class="{ on: batchMode }" @click="batchMode = !batchMode; batchSel = new Set()">
+                {{ batchMode ? '退出多选' : '多选' }}
+              </button>
+              <button v-if="batchMode && batchSel.size" class="ghost small" @click="batchDlg = true">
+                批量重命名（{{ batchSel.size }}）
+              </button>
               <span class="grow"></span>
               <label class="ghost small file">
                 <input type="file" accept="image/*" hidden @change="addIntoPack(p.id, $event)" />+ 添加贴纸
               </label>
             </div>
             <div class="grid full">
-              <div v-for="i in p.items" :key="i.id" class="po-cell">
+              <div v-for="i in p.items" :key="i.id" class="po-cell"
+                   :class="{ sel: batchSel.has(i.id) }"
+                   @click="batchMode ? toggleBatchSel(i.id) : null">
                 <img :src="src(i.urlOriginal || i.url)" alt="" />
-                <span class="po-name" :title="i.name">{{ (i.name || '').slice(0, 10) }}</span>
+                <span class="po-name" :title="fullName(i)">{{ fullName(i) }}</span>
               </div>
             </div>
           </div>
@@ -132,10 +195,11 @@ async function confirmZipImport() {
     </KCard>
 
     <KCard title="个人收藏（发送表情时用这个）" class="mt" :pad="false">
-      <div class="grid wide">
-        <div v-for="e in s.list || []" :key="e.id" class="cell">
+      <div class="grid wide fav-grid">
+        <div v-for="e in s.list || []" :key="e.id" class="fav-cell" :title="fullName(e)">
           <img :src="src(e.urlOriginal || e.url)" alt=""
                @error="(ev: any) => (ev.target.style.visibility = 'hidden')" />
+          <span class="fav-name">{{ fullName(e) }}</span>
           <span class="top" @click="st.topping(e)" title="置顶">↑</span>
           <span class="del" @click="st.remove(e)" title="删除">×</span>
         </div>
@@ -147,9 +211,43 @@ async function confirmZipImport() {
     <div v-if="editing" class="mask" @click.self="editing = null">
       <KCard title="重命名表情包" style="width: 380px; max-width: 92vw">
         <div class="row">
-          <input v-model="editing.name" />
+          <input v-model="editing.name" autofocus />
           <button class="small" @click="st.renamePack(editing.id, editing.name); editing = null">保存</button>
           <button class="ghost small" @click="editing = null">取消</button>
+        </div>
+      </KCard>
+    </div>
+
+    <!-- 批量重命名对话框（PowerRename 式：模式 {n}=序号 + 可选正则替换 + 实时预览） -->
+    <div v-if="batchDlg" class="mask" @click.self="batchDlg = false">
+      <KCard title="批量重命名" style="width: 460px; max-width: 94vw">
+        <div class="row">
+          <span class="lab">命名模式</span>
+          <input v-model="batchPattern" placeholder="如：表情_{n}（{n}=序号）" autofocus />
+        </div>
+        <div class="row">
+          <span class="lab">起始序号</span>
+          <input v-model.number="batchStart" type="number" min="0" style="max-width: 90px" />
+        </div>
+        <div class="row">
+          <span class="lab">正则替换</span>
+          <input v-model="batchRegexFrom" placeholder="匹配（可空）" style="max-width: 130px" />
+          <span class="dim small">→</span>
+          <input v-model="batchRegexTo" placeholder="替换为" style="max-width: 130px" />
+        </div>
+        <div class="batch-prev">
+          <div v-for="r in batchPreview.slice(0, 8)" :key="r.id" class="bp-row">
+            <span class="dim small from">{{ r.from }}</span>
+            <span class="dim small">→</span>
+            <b>{{ r.to }}</b>
+          </div>
+          <div v-if="batchPreview.length > 8" class="dim small">…共 {{ batchPreview.length }} 项</div>
+        </div>
+        <div class="row">
+          <button class="small" :disabled="batchBusy || !batchPreview.length" @click="applyBatchRename">
+            {{ batchBusy ? '重命名中…' : `重命名 ${batchPreview.length} 项` }}
+          </button>
+          <button class="ghost small" @click="batchDlg = false">取消</button>
         </div>
       </KCard>
     </div>
@@ -170,6 +268,35 @@ async function confirmZipImport() {
 .po-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 72px; }
 .po-cell img { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; background: var(--card2); }
 .po-name { font-size: 10px; color: var(--fg2); max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 收藏格紧凑（与聊天右键收藏同款小格）+ 完整文件名 */
+.fav-grid { gap: 8px; }
+.fav-cell {
+  position: relative; width: 52px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--card2); padding: 3px;
+}
+.fav-cell img { width: 44px; height: 44px; object-fit: contain; border-radius: 5px; }
+.fav-name {
+  font-size: 9px; color: var(--fg2); max-width: 50px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; text-align: center;
+}
+.fav-cell .top, .fav-cell .del {
+  position: absolute; top: 1px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--card); color: var(--fg2); font-size: 11px; line-height: 1;
+  display: grid; place-items: center; opacity: 0; cursor: pointer;
+}
+.fav-cell .top { left: 1px; } .fav-cell .del { right: 1px; }
+.fav-cell:hover .top, .fav-cell:hover .del { opacity: .9; }
+/* 多选态 */
+.po-cell.sel { outline: 2px solid var(--acc); border-radius: 10px; }
+.po-cell { cursor: pointer; }
+/* 批量重命名预览 */
+.batch-prev {
+  max-height: 160px; overflow: auto; margin: 8px 0; padding: 6px 8px;
+  background: var(--card2); border-radius: 8px; display: flex; flex-direction: column; gap: 3px;
+}
+.bp-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.bp-row .from { text-decoration: line-through; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lab { flex: 0 0 64px; font-size: 12.5px; color: var(--fg2); }
 .phead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .acts { display: flex; gap: 6px; flex: 1 0 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .acts::-webkit-scrollbar { display: none; }

@@ -104,7 +104,7 @@ const appService = {
   registry,
   revision,
   services,
-  version: '1.0.0',
+  version: (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.3'),
 
   /**
    * 插件的 Config Schema（对标 Koishi：插件导出 Config: Schema<Config>）。

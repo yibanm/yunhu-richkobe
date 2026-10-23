@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import https from 'node:https'
 import { readFile, writeFile, unlink } from 'node:fs/promises'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 
@@ -119,7 +119,10 @@ function dataPlugin() {
   }
 }
 
+const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'))
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [vue(), resProxyPlugin(), upProxyPlugin(), configPlugin(), dataPlugin()],
   base: './',
   // 构建目标 es2020：安卓 WebView（部分设备 Chrome < 90）不支持 es2022 新语法，

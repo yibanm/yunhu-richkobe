@@ -62,6 +62,8 @@ const isFriend = computed(() => {
 async function addFriend() {
   const id = data.value?.id || g.state.profileUser?.id
   if (!id) return
+  const name = data.value?.name || g.state.profileUser?.name || id
+  if (!(await ui.confirm?.('添加好友', `向「${name}」发送好友申请？`))) return
   try {
     await api.applyFriend(id, 1, '')
     ui.toast('已发送好友申请', 'success')

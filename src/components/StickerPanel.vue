@@ -76,13 +76,11 @@ watch(() => s.panelOpen, (v) => {
 })
 onUnmounted(() => document.removeEventListener('paste', onPaste))
 
-/** 表情显示名：优先 name，回退文件名（去扩展名截断） */
+/** 表情显示名：完整文件名（含后缀），截断交给 CSS 省略号 */
 function nameOf(e: any): string {
-  const n = e.name || ''
-  if (n) return n.length > 10 ? n.slice(0, 10) + '…' : n
+  if (e.name) return e.name
   const u = String(e.urlOriginal || e.url || '')
-  const f = u.split('/').pop() || ''
-  return (f.replace(/\.\w+$/, '') || '表情').slice(0, 10)
+  return u.split('/').pop() || String(e.id)
 }
 
 /** 收藏项重命名：云端无 expression rename 接口，如实提示 */
@@ -211,14 +209,14 @@ function qrDrop(targetId: string) {
         <span v-if="s.packsLoading" class="dim small">加载表情包…</span>
       </div>
       <div v-if="addPackOpen" class="sp-addrow">
-        <input v-model="addPackId" placeholder="表情包 ID" inputmode="numeric" />
+        <input v-model="addPackId" placeholder="表情包 ID" inputmode="numeric" autofocus />
         <button class="ghost tiny" :disabled="!addPackId.trim()" @click="addPack">收藏</button>
       </div>
 
       <!-- 重命名内联输入（不用原生 prompt） -->
       <div v-if="renaming" class="sp-addrow">
         <span class="dim small">重命名：</span>
-        <input v-model="renaming.name" @keyup.enter="renameStickerOk" @keyup.esc="renaming = null" />
+        <input v-model="renaming.name" @keyup.enter="renameStickerOk" @keyup.esc="renaming = null" autofocus />
         <button class="ghost tiny" @click="renameStickerOk">保存</button>
         <button class="ghost tiny" @click="renaming = null">取消</button>
       </div>

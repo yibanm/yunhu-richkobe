@@ -143,17 +143,6 @@ async function clearLocalHistory() {
   ctx.ui?.toast?.('本地聊天记录已清除', 'success')
 }
 
-/** 举报该群（/v1/report/create；确认框为应用内弹窗，不用原生 prompt） */
-async function reportGroup() {
-  const c = cur.value
-  if (!c) return
-  const ok = await ctx.ui?.confirm?.('举报该群', `确定举报「${c.name}」？\n理由：骚扰/违规内容`, { okText: '提交举报', danger: true })
-  if (!ok) return
-  try {
-    await ctx.api.report(c.id, 2, c.name, '骚扰/违规内容')
-    ctx.ui?.toast?.('举报已提交', 'success')
-  } catch (e: any) { ctx.ui?.toast?.('举报失败：' + e.message, 'error') }
-}
 
 async function copyGroupId() {
   const c = cur.value
@@ -238,7 +227,13 @@ async function delFriend() {
     ctx.social?.loadBook?.()
   } catch (e: any) { ctx.ui?.toast?.('删除失败：' + e.message, 'error') }
 }
-function mmFriend() { const m = mm.value.m; closeMM(); if (m) ctx.social?.apply?.(m.id, 1, '') }
+async function mmFriend() {
+  const m = mm.value.m; closeMM()
+  if (!m) return
+  if (!(await ctx.ui?.confirm?.('添加好友', `向「${m.name}」发送好友申请？`))) return
+  try { await ctx.social?.apply?.(m.id, 1, ''); ctx.ui?.toast?.('好友申请已发送', 'success') }
+  catch (e: any) { ctx.ui?.toast?.('申请失败：' + e.message, 'error') }
+}
 async function mmGag() {
   const m = mm.value.m; closeMM()
   if (!m) return
@@ -342,7 +337,6 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
         <!-- 删除聊天记录：云端无删记录端点，此处清本地缓存（消息 state + 会话快照），隐私向实质功能 -->
         <button class="gp-clear" @click="clearLocalHistory">删除聊天记录（本地缓存）</button>
 
-        <button class="gp-report" @click="reportGroup">被骚扰了？举报该群</button>
       </template>
 
       <!-- ============ 私聊 ============ -->
@@ -486,11 +480,6 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
   color: var(--fg); padding: 9px 10px; font-size: 13px; outline: none;
 }
 .gp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.gp-report {
-  margin-top: 10px; padding: 8px 0; border: none; border-radius: 9px; background: none;
-  color: var(--acc); font-size: 12.5px; cursor: pointer; text-align: center;
-}
-.gp-report:hover { background: var(--acc-soft, var(--card2)); }
 .gp-clear {
   margin-top: 8px; padding: 9px 0; border-radius: 9px; border: none;
   background: color-mix(in srgb, var(--err) 12%, transparent); color: var(--err);
