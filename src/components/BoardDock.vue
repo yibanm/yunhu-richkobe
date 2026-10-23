@@ -119,15 +119,17 @@ async function jumpToMsg(r: any) {
   // ① 本地消息区已有这条 → 直接高亮
   if (chat.state.messages.some((m: any) => m.id === r.id)) {
     chat.state.jumpedAway = true
+    chat.state.locateId = r.id
     highlight()
     return
   }
-  // ② 拉该消息前后上下文
+  // ② 拉该消息前后上下文（seq 传搜索结果的 sequence，官方语义；拿不到传 -1=uint64max）
   try {
-    const around = await ctx.api.messagesAround(cur.id, cur.type, r.id, 30)
-    if (around.length) {
+    const around = await ctx.api.messagesAround(cur.id, cur.type, r.id, 30, Number(r.seq) || -1)
+    if (around.length && around.some((m: any) => m.id === r.id)) {
       chat.state.messages = around
       chat.state.jumpedAway = true
+      chat.state.locateId = r.id          // 持续色块指示，直到下次 open/跳转
       highlight()
       return
     }

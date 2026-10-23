@@ -76,7 +76,20 @@ watch(() => s.panelOpen, (v) => {
 })
 onUnmounted(() => document.removeEventListener('paste', onPaste))
 
-/** 外来表情包里的表情：右键弹出「收藏」按钮，点按钮才收藏（QQ 式两段交互） */
+/** 表情显示名：优先 name，回退文件名（去扩展名截断） */
+function nameOf(e: any): string {
+  const n = e.name || ''
+  if (n) return n.length > 10 ? n.slice(0, 10) + '…' : n
+  const u = String(e.urlOriginal || e.url || '')
+  const f = u.split('/').pop() || ''
+  return (f.replace(/\.\w+$/, '') || '表情').slice(0, 10)
+}
+
+/** 收藏项重命名：云端无 expression rename 接口，如实提示 */
+async function renameFav(e: any) {
+  favAsk.value = null
+  ctx.ui?.toast?.('个人收藏不支持改名（云端无接口）；表情包内贴纸可改名', 'warn')
+}
 const favAsk = ref<any>(null)
 function askFav(e: any, ev: MouseEvent) {
   favAsk.value = e
@@ -202,24 +215,40 @@ function qrDrop(targetId: string) {
         <button class="ghost tiny" :disabled="!addPackId.trim()" @click="addPack">收藏</button>
       </div>
 
+      <!-- 重命名内联输入（不用原生 prompt） -->
+      <div v-if="renaming" class="sp-addrow">
+        <span class="dim small">重命名：</span>
+        <input v-model="renaming.name" @keyup.enter="renameStickerOk" @keyup.esc="renaming = null" />
+        <button class="ghost tiny" @click="renameStickerOk">保存</button>
+        <button class="ghost tiny" @click="renaming = null">取消</button>
+      </div>
+
       <div class="sp-body">
         <div class="grid">
           <template v-if="tab === 'fav'">
-            <button v-for="e in list" :key="e.id" class="cell" :title="'点击发送'" @click="st.send(e)">
-              <img :src="src(e)" loading="lazy" alt=""
-                   @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
-              <span class="top" @click.stop="st.topping(e)" title="置顶">↑</span>
-              <span class="del" @click.stop="st.remove(e)" title="从收藏删除">×</span>
-            </button>
-          </template>
-          <template v-else>
-            <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送 · 右键弹出收藏按钮'"
+            <button v-for="e in list" :key="e.id" class="cell" :title="'点击发送 · 右键更多'"
                     @click="st.send(e)" @contextmenu.prevent="askFav(e, $event)">
               <img :src="src(e)" loading="lazy" alt=""
                    @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
-              <!-- 右键后弹出的「收藏」小按钮（QQ 式：右键不直接收藏，先出按钮再点） -->
-              <span v-if="favAsk?.id === e.id" class="fav-ask" @click.stop="doFav(e)">
-                <Icon name="star" :size="13" /> 收藏
+              <span class="cell-name" :title="nameOf(e)">{{ nameOf(e) }}</span>
+              <span class="top" @click.stop="st.topping(e)" title="置顶">↑</span>
+              <span class="del" @click.stop="st.remove(e)" title="从收藏删除">×</span>
+              <!-- 右键小菜单：收藏到包 / 重命名 -->
+              <span v-if="favAsk?.id === e.id" class="fav-ask menu" @click.stop>
+                <button @click.stop="renameFav(e)">重命名</button>
+              </span>
+            </button>
+          </template>
+          <template v-else>
+            <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送 · 右键更多'"
+                    @click="st.send(e)" @contextmenu.prevent="askFav(e, $event)">
+              <img :src="src(e)" loading="lazy" alt=""
+                   @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
+              <span class="cell-name" :title="nameOf(e)">{{ nameOf(e) }}</span>
+              <!-- 右键小菜单：收藏 / 重命名 -->
+              <span v-if="favAsk?.id === e.id" class="fav-ask menu" @click.stop>
+                <button @click.stop="doFav(e)"><Icon name="star" :size="12" /> 收藏</button>
+                <button @click.stop="renameSticker(e)">重命名</button>
               </span>
               <span class="cell-acts">
                 <span class="ca" title="重命名" @click.stop="renameSticker(e)">✎</span>
@@ -286,6 +315,11 @@ function qrDrop(targetId: string) {
   font-size: 11px; line-height: 1; display: grid; place-items: center; cursor: pointer;
 }
 .cell-acts .ca.del:hover { background: var(--err); }
+/* 格下文件名（单行截断） */
+.cell-name {
+  display: block; width: 100%; font-size: 9.5px; color: var(--fg2); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 2px 0;
+}
 /* 面板底部快捷回复条 */
 .sp-qr {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -303,10 +337,10 @@ function qrDrop(targetId: string) {
 .cell { position: relative; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 9px; background: var(--card2); padding: 4px; cursor: pointer; overflow: hidden; }
 .cell:hover { border-color: var(--acc); }
 .cell img { width: 100%; height: 100%; object-fit: contain; }
-.top { position: absolute; top: 2px; left: 4px; font-size: 12px; color: var(--fg2); background: var(--card); border-radius: 50%; width: 16px; height: 16px; line-height: 15px; text-align: center; opacity: 0; }
+.top { position: absolute; top: 2px; left: 4px; font-size: 12px; color: var(--fg2); background: var(--card); border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; line-height: 1; opacity: 0; }
 .cell:hover .top { opacity: .9; }
 .top:hover { color: var(--acc); }
-.del { position: absolute; top: 2px; right: 4px; font-size: 13px; color: var(--fg2); background: var(--card); border-radius: 50%; width: 16px; height: 16px; line-height: 15px; text-align: center; opacity: 0; }
+.del { position: absolute; top: 2px; right: 4px; font-size: 13px; color: var(--fg2); background: var(--card); border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; line-height: 1; opacity: 0; }
 .cell:hover .del { opacity: .9; }
 .del:hover { color: var(--err); }
 .file { display: inline-flex; align-items: center; cursor: pointer; padding: 3px 10px; font-size: 12px; border-radius: 7px; border: 1px solid var(--line); }

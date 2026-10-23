@@ -72,6 +72,8 @@ export const chatPlugin = {
       keyword: '',
       /* 搜索跳转到历史位置后置 true；顶栏显示「回到最新」入口，loadMessages/open 时清除 */
       jumpedAway: false,
+      /* 搜索定位的目标消息 id：持续色块指示（引用式高亮框），open/回最新时清除 */
+      locateId: null as string | null,
       /* ---- 多选态 ---- */
       selecting: false,
       selected: [] as string[],
@@ -426,7 +428,7 @@ export const chatPlugin = {
     async function loadMessages(silent = false) {
       const cur = state.current
       if (!cur) return
-      if (!silent) state.jumpedAway = false    // 主动重载=回最新，清「回到最新」入口
+      if (!silent) { state.jumpedAway = false; state.locateId = null }   // 主动重载=回最新
       state.loadingMsgs = !silent
       try {
         const list = (await api.messages(cur.id, cur.type, 30)).map(withElements)
@@ -471,6 +473,7 @@ export const chatPlugin = {
       state.messages = []
       state.hasMore = true
       state.jumpedAway = false
+      state.locateId = null
       state.searchResults = []
       state.searchWord = ''
       clearReply()

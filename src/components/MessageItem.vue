@@ -41,6 +41,8 @@ const quote = computed(() => {
 })
 
 const isTip = computed(() => props.msg.type === 9 && !props.msg.recalled)
+/** 搜索定位目标：持续色块指示（引用式高亮框），直到回最新/切会话 */
+const isLocated = computed(() => ctx.chat?.state?.locateId === props.msg.id)
 /**
  * 消息头顶的头衔。
  * ① 首选**消息自带的** Sender.tag（云湖把管理员设的头衔塞在发送者结构里，
@@ -100,7 +102,7 @@ function onA2uiAction(a: any) {
   <div v-if="isTip" class="sys">{{ msg.content?.text || msg.content?.tip }}</div>
 
   <div v-else class="row" :data-mid="msg.id"
-       :class="{ right: msg.right, picked: selected, selecting, recalled: msg.recalled }"
+       :class="{ right: msg.right, picked: selected, selecting, recalled: msg.recalled, locate: isLocated }"
        @contextmenu="onContextMenu" @click="onClick">
     <span v-if="selecting" class="pick" :class="{ on: selected }">{{ selected ? '✓' : '' }}</span>
 
@@ -130,7 +132,7 @@ function onA2uiAction(a: any) {
       </div>
     </div>
 
-    <button v-if="!selecting" class="more" title="更多操作" @click.stop="onMore">⋯</button>
+    <!-- 「⋯」按钮按用户要求移除：消息操作一律走右键/长按菜单 -->
   </div>
 </template>
 

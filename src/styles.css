@@ -448,6 +448,10 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
   0% { box-shadow: 0 0 0 3px var(--acc); }
   100% { box-shadow: 0 0 0 3px transparent; }
 }
+/* 搜索定位目标：持续色块指示（引用式高亮框），直到回最新/切会话 */
+.row.locate .bubble {
+  box-shadow: 0 0 0 3px var(--acc);
+}
 
 
 /* ================= 控制台页面 · 手机适配 =================

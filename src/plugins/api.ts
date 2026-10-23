@@ -994,7 +994,7 @@ export const apiPlugin = {
         return r.json?.data || {}
       },
       /** 按 msgId 拉前后一段消息（定位跳转用）；proto: seq=3 chatType=4 chatId=5 unknown=6 count=7 msgId=8 */
-      async messagesAround(chatId: string, chatType: number, msgId: string, count = 20, seq = 0) {
+      async messagesAround(chatId: string, chatType: number, msgId: string, count = 20, seq = -1) {
         const body = pb.build(pb.fNum(3, seq), pb.fNum(4, chatType), pb.fStr(5, chatId), pb.fNum(6, 0), pb.fNum(7, count), pb.fStr(8, msgId))
         const r = assertOk(await request('/v1/msg/list-message-by-mid-seq', { body }))
         return pb.each(r.pb, 2).map(decodeMsg).sort((a: any, b: any) => a.ts - b.ts)
