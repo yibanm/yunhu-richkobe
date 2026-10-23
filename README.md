@@ -82,8 +82,11 @@ render(Element[]) -> { contentType, content }    // 适配器出
 | 分支 | 内容 | 产物 |
 |---|---|---|
 | `master` / `dev` | Web 版（Vue 前端 + Node 代理） | — |
-| `desktop` | + Electron 桌面端 | `yunhulaoda-<版本>-windows-x64-setup.exe` / `-windows-x64.zip` |
-| `android` | + Capacitor 安卓端 | `yunhulaoda-<版本>-android-arm64.apk` |
+| `desktop` | Tauri 桌面端（Node sidecar 服务） | `yunhulaoda-<版本>-windows-x64-tauri-setup.exe` / `-tauri-portable.zip` |
+
+> 历史说明：Electron 桌面端与 Capacitor 安卓端自 v1.0.3 起停止构建与发布，
+> 旧版产物已从 Release 移除。安卓客户端推荐原生实现：
+> [Yhchat_md3](https://github.com/Kauid323/Yhchat_md3)、[Murexide](https://github.com/murexide-project/Murexide)。
 
 版本遵循语义化版本，从 `1.0.0` 起。
 

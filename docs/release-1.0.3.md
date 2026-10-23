@@ -31,8 +31,9 @@
 
 ## 平台说明
 
-- Windows / macOS / Linux：桌面客户端，内置服务，双击即用（未签名，安装时请允许）
-- 安卓：WebView 方案体验有限，推荐原生实现 [Yhchat_md3](https://github.com/Kauid323/Yhchat_md3) 或 [Murexide](https://github.com/murexide-project/Murexide)
+- **Windows（Tauri 版）**：安装包 23MB、便携版 35MB，系统 WebView2 内核；自本版起为唯一桌面发布形态
+- Electron 桌面端与安卓端自本版起停止构建与发布，旧产物已从 Release 移除
+- 安卓客户端推荐原生实现：[Yhchat_md3](https://github.com/Kauid323/Yhchat_md3) 或 [Murexide](https://github.com/murexide-project/Murexide)
 
 ## 数据与隐私
 
