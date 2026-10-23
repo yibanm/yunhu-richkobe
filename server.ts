@@ -393,10 +393,15 @@ try {
     ], { stdio: 'ignore' })
     console.log('[yunhu] 已自签 HTTPS 证书（自签的，浏览器会提示不安全，手动信任即可）')
   }
-  https.createServer({
+  const httpsSrv = https.createServer({
     key: readFileSync(keyFile),
     cert: readFileSync(certFile),
-  }, serverApp).listen(HTTPS_PORT, HOST, () => {
+  }, serverApp)
+  // 端口被占（如已有实例/sidecar 并存）只降级不崩进程：http 主服务仍可用
+  httpsSrv.on('error', (e: any) => {
+    console.log(`[yunhu] https ${HTTPS_PORT} 起不来（${e.code || e.message}），仅 http 可用`)
+  })
+  httpsSrv.listen(HTTPS_PORT, HOST, () => {
     console.log(`[yunhu] https://${HOST}:${HTTPS_PORT}  (手机录音/录像要用这个，因为是安全上下文)`)
   })
 } catch (e: any) {
