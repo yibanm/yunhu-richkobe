@@ -19,8 +19,11 @@ const s = st.state
 const tab = ref<'fav' | number>('fav')
 function pickTab(t: 'fav' | number) {
   tab.value = t
+  s.activeTab = t
   if (t !== 'fav' && !s.packs.length) st.loadPacks?.()
 }
+// 外部定位（聊天里点表情 → openPackOf 设 activeTab）
+watch(() => s.activeTab, (t) => { if (t !== tab.value) { tab.value = t; if (t !== 'fav' && !s.packs.length) st.loadPacks?.() } })
 // 打开面板时顺带拉一次表情包组
 watch(() => s.panelOpen, (v) => { if (v && !s.packs.length) st.loadPacks?.() })
 
@@ -112,6 +115,15 @@ async function favFromPack(e: any) {
 /* ---- 收藏他人表情包（/v1/sticker/add）与单贴纸管理（rename/remove） ---- */
 const addPackOpen = ref(false)
 const addPackId = ref('')
+async function addPackById(id: number) {
+  try {
+    await ctx.api.stickerAddPack(id)
+    ctx.ui?.toast?.('合集已添加', 'success')
+    st.suggestPack.id = 0
+    await st.loadPacks()
+    pickTab(id)
+  } catch (e: any) { ctx.ui?.toast?.('添加失败：' + e.message, 'error') }
+}
 async function addPack() {
   const id = Number(addPackId.value.trim())
   if (!id) return
@@ -207,6 +219,12 @@ function qrDrop(targetId: string) {
         <span class="grow"></span>
         <button class="ghost tiny" title="输入表情包 ID 收藏到账号" @click="addPackOpen = !addPackOpen">+ 收藏表情包</button>
         <span v-if="s.packsLoading" class="dim small">加载表情包…</span>
+      </div>
+      <!-- 聊天点表情但该合集未收藏时的提示条 -->
+      <div v-if="st.suggestPack?.id" class="sp-addrow">
+        <span class="dim small">该表情来自{{ st.suggestPack.name }}（未收藏）</span>
+        <button class="ghost tiny" @click="addPackById(st.suggestPack.id)">添加该合集</button>
+        <button class="ghost tiny" @click="st.suggestPack.id = 0">忽略</button>
       </div>
       <div v-if="addPackOpen" class="sp-addrow">
         <input v-model="addPackId" placeholder="表情包 ID" inputmode="numeric" autofocus />

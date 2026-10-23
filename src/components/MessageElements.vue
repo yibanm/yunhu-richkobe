@@ -97,6 +97,12 @@ function openVideo(src: string) {
   if (u) { viewer.value = { kind: 'video', url: u }; zoom.value = 1; pan.value = { x: 0, y: 0 } }
 }
 function closeViewer() { viewer.value = null }
+
+/** 聊天里左键点表情 → 打开表情面板并定位到它所属合集（未收藏则提示可添加） */
+function openStickerPack(el: any) {
+  const a = el.attrs || {}
+  ctx.stickers?.openPackOf?.(a.packId || 0, a.expressionId || a.itemId || 0)
+}
 /** 滚轮缩放（以 1.25 步进，限 0.2–8 倍） */
 function onWheel(e: WheelEvent) {
   if (!viewer.value || viewer.value.kind !== 'image') return
@@ -203,7 +209,8 @@ watch(() => props.elements, fix, { deep: true })
       <img v-else-if="el.type === 'img'" class="media" :src="resUrl(el.attrs.src)" loading="lazy"
            :style="ratioOf(el)" alt="[图片]" @click="openRaw(el.attrs.src)"
            @error="(e: any) => (e.target.style.display = 'none')" />
-      <img v-else-if="el.type === 'sticker'" class="sticker" :src="resUrl(el.attrs.src)" loading="lazy" alt="[表情]" />
+      <img v-else-if="el.type === 'sticker'" class="sticker" :src="resUrl(el.attrs.src)" loading="lazy" alt="[表情]"
+           title="点击查看所属合集" style="cursor:pointer" @click.stop="openStickerPack(el)" />
       <div v-else-if="el.type === 'video'" class="video-wrap">
         <video class="media" :src="mediaUrl(el.attrs.src, 'video')" controls preload="metadata" @click="openVideo(el.attrs.src)"></video>
         <span v-if="el.attrs.time" class="vtime">{{ el.attrs.time }}s</span>

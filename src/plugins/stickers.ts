@@ -46,6 +46,7 @@ export const stickersPlugin = {
       list: [] as any[],
       loading: false,
       panelOpen: false,
+      activeTab: 'fav' as 'fav' | number,   // 面板当前页签（openPackOf 可外部定位）
       keyword: '',
       recording: false,
       seconds: 0,
@@ -120,11 +121,11 @@ export const stickersPlugin = {
       } catch (e: any) { ui.toast('收藏失败：' + e.message, 'error') }
     }
 
-    /** 把一张已在云端的图（消息里的 url/key）加进表情包组 */
+    /** 把一张已在云端的图（消息里的 url/key）加进表情包组（add-sticker 要相对 key） */
     async function addUrlToPack(url: string, packId: number, name: string) {
-      const full = /^https?:\/\//i.test(url) ? url : `https://chat-img.jwznb.com/${String(url).replace(/^\/+/, '')}`
+      const rel = String(url).replace(/^https?:\/\/[^/]+\//, '')
       try {
-        await api.stickerAddSticker(packId, name, full)
+        await api.stickerAddSticker(packId, name, rel)
         ui.toast('已加入表情包', 'success')
         await loadPacks()
       } catch (e: any) { ui.toast('加入失败：' + e.message, 'error') }
@@ -311,9 +312,30 @@ export const stickersPlugin = {
       } catch (e: any) { ui.toast('收藏失败：' + e.message, 'error') }
     }
 
+    /**
+     * 聊天里左键点表情 → 打开面板并定位到它所属的合集页签。
+     * 合集不在我的收藏里时：停在收藏页签并给出「添加该合集」提示条（suggestPack）。
+     */
+    const suggestPack = { id: 0, name: '' }
+    async function openPackOf(packId: number | string, expressionId: number | string) {
+      state.panelOpen = true
+      if (!state.packs.length) await loadPacks()
+      const pid = Number(packId) || 0
+      const hit = pid ? state.packs.find((p: any) => p.id === pid) : null
+      if (hit) {
+        suggestPack.id = 0; suggestPack.name = ''
+        state.activeTab = hit.id
+        return
+      }
+      // 不在收藏：收藏页签 + 提示条（expressionId 有值时也能定位到收藏项）
+      suggestPack.id = pid
+      suggestPack.name = pid ? `合集 ${pid}` : ''
+      state.activeTab = 'fav'
+    }
+
     const service = {
       state, load, open, close, send, uploadAndAdd, remove, topping, addFromUrl,
-      addFileToTarget, addUrlToPack,
+      addFileToTarget, addUrlToPack, suggestPack, openPackOf,
       loadPacks, createPack, renamePack, deletePack, removePack,
       recordStart, recordStop, sendAudioFile,
       sendVideo, sendVideoFile, recordVideoStart, recordVideoStop,
