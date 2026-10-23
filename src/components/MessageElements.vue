@@ -181,27 +181,30 @@ async function onMsgButton(el: any) {
 async function saveFile(el: any) {
   const url = mediaUrl(el.attrs.src, 'file')
   const name = el.attrs.name || decodeURIComponent(url.split('/').pop() || 'file')
-  try {
-    ctx.ui?.toast?.('准备保存…', 'info')
-    const r = await fetch(url)
-    if (!r.ok) throw new Error('下载失败 HTTP ' + r.status)
-    const blob = await r.blob()
-    const w = window as any
-    if (w.showSaveFilePicker) {
+  const w = window as any
+  // WebView2 不一定支持 File System Access API：先探测，不支持直接走 server 回退
+  if (typeof w.showSaveFilePicker === 'function') {
+    try {
+      const r = await fetch(url)
+      if (!r.ok) throw new Error('下载失败 HTTP ' + r.status)
+      const blob = await r.blob()
       const handle = await w.showSaveFilePicker({ suggestedName: name })
       const ws = await handle.createWritable()
       await ws.write(blob)
       await ws.close()
       ctx.ui?.toast?.('已保存', 'success')
       return
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return          // 用户取消另存为
+      // 其它错误（含 API 不可用）落到 server 回退，不直接报错
     }
-    // 回退：server 端下载到文件目录 + 资源管理器定位（GET！）
+  }
+  try {
     const r2 = await fetch('/local-open?url=' + encodeURIComponent(url) + '&name=' + encodeURIComponent(name))
     const j = await r2.json().catch(() => null)
     if (!j?.ok) throw new Error(j?.msg || ('HTTP ' + r2.status))
     ctx.ui?.toast?.('已保存到文件目录并在资源管理器中打开', 'success')
   } catch (e: any) {
-    if (e?.name === 'AbortError') return   // 用户取消另存为
     ctx.ui?.toast?.('保存失败：' + e.message, 'error')
   }
 }

@@ -55,18 +55,19 @@ function mountFileUrl(name: string) {
   return `${location.origin}/webdav/${gid}/@mount/${mid}/${p}?token=${encodeURIComponent(token)}`
 }
 
-/** 定位文件：挂载盘内高亮；云盘文件走 server /local-open（下载缓存 + 系统资源管理器选中） */
+/** 定位文件：一律走系统资源管理器（server /local-open 下载缓存 + explorer /select）；
+ *  挂载盘文件用网关地址，云盘文件用 fileUrl */
 async function locateFile(name: string) {
-  if (g.state.mountView) { g.state.mountHighlight = name; return }
-  // 云盘视图：找到该文件条目，用它的 fileUrl 调本地打开
-  const f = (g.state.diskList || []).find((x: any) => x.name === name)
-  const url = f?.fileUrl ? resUrl(f.fileUrl) : ''
-  if (!url) { g.locateFile?.(name); return }
+  let url = ''
+  if (g.state.mountView) {
+    url = mountFileUrl(name)
+  } else {
+    const f = (g.state.diskList || []).find((x: any) => x.name === name)
+    url = f?.fileUrl ? resUrl(f.fileUrl) : ''
+  }
+  if (!url) { ctx.ui?.toast?.('找不到该文件地址', 'warn'); return }
   try {
-    const r = await fetch('/local-open', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url, name }),
-    })
+    const r = await fetch('/local-open?url=' + encodeURIComponent(url) + '&name=' + encodeURIComponent(name))
     const j = await r.json().catch(() => null)
     if (!j?.ok) ctx.ui?.toast?.('打开失败：' + (j?.msg || r.status), 'error')
   } catch (e: any) { ctx.ui?.toast?.('打开失败：' + e.message, 'error') }

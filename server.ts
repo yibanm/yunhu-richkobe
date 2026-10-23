@@ -383,9 +383,9 @@ async function handleLocalOpen(req: http.IncomingMessage, res: http.ServerRespon
       }).on('error', reject)
     })
     await writeFile(dest, data)
-    // 系统资源管理器定位
+    // 系统资源管理器定位（⚠️ 不能加 windowsHide：会把资源管理器窗口一起藏掉）
     if (process.platform === 'win32') {
-      execFileSync('explorer.exe', ['/select,' + dest], { stdio: 'ignore', windowsHide: true })
+      execFileSync('explorer.exe', ['/select,' + dest], { stdio: 'ignore' })
     } else {
       execFileSync(process.platform === 'darwin' ? 'open' : 'xdg-open', [FILE_DIR], { stdio: 'ignore' })
     }
