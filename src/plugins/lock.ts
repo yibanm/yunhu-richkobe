@@ -106,6 +106,13 @@ export const lockPlugin = {
       return true
     }
 
+    /** 忘记密码流程：身份验证通过后清除旧 PIN（调用方随后走 setPin 重设） */
+    async function clearPin(): Promise<void> {
+      pinHash = ''
+      state.hasPin = false
+      await storage.remove('pin').catch(() => {})
+    }
+
     /** 桌面端：发起手机端解锁请求 */
     async function requestRemoteUnlock(): Promise<void> {
       const nonce = 'u' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36)
@@ -176,7 +183,7 @@ export const lockPlugin = {
     ctx.on('app/lock', () => lock())
 
     const lockApi = {
-      state, lock, unlock, checkPin, setPin, requestRemoteUnlock, answerRemote,
+      state, lock, unlock, checkPin, setPin, clearPin, requestRemoteUnlock, answerRemote,
       get isLocked() { return state.locked },
     }
     ctx.set('lock', lockApi)

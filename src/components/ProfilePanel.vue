@@ -124,7 +124,7 @@ function copyId() {
   const id = data.value?.id || g.state.profileUser?.id
   navigator.clipboard?.writeText(id).then(
     () => ui.toast('已复制 ID', 'success'),
-    () => window.prompt('复制 ID：', id),
+    () => navigator.clipboard.writeText(String(id)).then(() => ui.toast('已复制 ' + id, 'success')).catch(() => ui.toast('复制失败', 'error')),
   )
 }
 </script>

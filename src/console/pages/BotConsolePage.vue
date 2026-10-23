@@ -34,7 +34,7 @@ async function create() {
 function copy(text: string, label = '内容') {
   navigator.clipboard?.writeText(text).then(
     () => ctx.ui.toast(`已复制${label}`, 'success'),
-    () => window.prompt(`复制${label}：`, text))
+    () => navigator.clipboard.writeText(text).then(() => ctx.ui.toast(`${label}已复制`, 'success')).catch(() => ctx.ui.toast('复制失败', 'error')))
 }
 </script>
 

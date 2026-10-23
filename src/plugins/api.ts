@@ -538,7 +538,12 @@ export const apiPlugin = {
           createTime: p.createTime, updateTime: p.updateTime,
           userCount: p.userCount || 0, hot: p.hot || 0, sort: p.sort || 0,
           items: (p.stickerItems || []).map((i: any) => ({
-            id: i.id, name: i.name, url: i.url, urlOriginal: i.urlOriginal || i.url,
+            id: i.id, name: i.name,
+            // 自愈：历史脏数据 url 可能存了完整 URL（官方约定相对 key）——统一剥域名，
+            // 否则手机端二次补域名成坏地址、桌面端 /res 代理也会 404
+            url: String(i.url || '').replace(/^https?:\/\/[^/]+\//, ''),
+            urlOriginal: i.urlOriginal || i.url,
+            stickerPackId: i.stickerPackId ?? p.id,   // 合集 id：发送时回填 sticker_pack_id，手机端才能归到合集
           })),
         }))
       },
@@ -721,7 +726,8 @@ export const apiPlugin = {
             gagTs: pb.num(d, 4),
             // ⚠️ isGag 的布尔字段号不可靠（实测全员 true 的猎奇显示）；
             //    改按 gagTs（禁言到期时间戳）判定：未来时间才是在禁言中
-            isGag: pb.num(d, 4) > Date.now(),
+            // 禁言态默认空（字段号不可靠，实测全员误判）；仅 gag() 成功后本地置位
+            isGag: false,
             role: pb.num(d, 3) >= 100 ? '群主' : pb.num(d, 3) >= 2 ? '管理员' : '成员',
           }
         })

@@ -134,6 +134,40 @@ async function removeSticker(e: any) {
     await st.loadPacks()
   } catch (err: any) { ctx.ui?.toast?.('删除失败：' + err.message, 'error') }
 }
+/* ---- 快捷回复条（从输入区迁移至此；quickreply.enabled 默认 false，用户在设置或此处开启） ---- */
+const qr = ctx.quickreply
+const qrEnabled = computed(() => !!qr?.state?.enabled)
+const QR_ORDER_KEY = 'yh.qr.order'
+function loadOrder(key: string): string[] {
+  try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] }
+}
+const qrOrder = ref<string[]>(loadOrder(QR_ORDER_KEY))
+const qrItems = computed(() => {
+  const items = (ctx.chat?.composerOf?.('composer') || []).filter((it: any) => it.kind === 'quick')
+  const ord = qrOrder.value
+  return [...items].sort((a: any, b: any) => {
+    const ia = ord.indexOf(a.id), ib = ord.indexOf(b.id)
+    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib)
+  })
+})
+const qrAdding = ref(false)
+const qrNew = ref('')
+const qrDrag = ref('')
+function qrAdd() {
+  const t = qrNew.value.trim()
+  if (t) qr?.add?.(t)
+  qrNew.value = ''
+  qrAdding.value = false
+}
+function qrDrop(targetId: string) {
+  const from = qrDrag.value
+  qrDrag.value = ''
+  if (!from || from === targetId) return
+  const ids = qrItems.value.map((x: any) => x.id).filter((x: string) => x !== from)
+  ids.splice(ids.indexOf(targetId) + 1, 0, from)
+  qrOrder.value = ids
+  localStorage.setItem(QR_ORDER_KEY, JSON.stringify(ids))
+}
 </script>
 
 <template>
@@ -148,6 +182,8 @@ async function removeSticker(e: any) {
           <input type="file" accept="image/*" multiple hidden @change="onPickUpload" />上传到当前栏
         </label>
         <button class="ghost small" @click="st.load()">刷新</button>
+        <button class="ghost small" :class="{ on: qrEnabled }" title="在面板底部显示快捷回复条"
+                @click="qr?.toggle?.()">快捷回复</button>
         <button class="sp-x" @click="st.close()">×</button>
       </header>
 
@@ -199,6 +235,22 @@ async function removeSticker(e: any) {
           {{ s.packsLoading ? '加载中…' : '这个表情包是空的 —— 点「上传到当前栏」或 Ctrl+V 粘贴图片加入' }}
         </p>
       </div>
+
+      <!-- 快捷回复收藏条（从输入区移到这里；默认关，用户在此自行添加/排序） -->
+      <div v-if="qrEnabled" class="sp-qr">
+        <span class="dim small">快捷回复</span>
+        <button v-for="it in qrItems" :key="it.id" class="qr-chip" draggable="true"
+                @click="qr?.fire?.(it.value)"
+                @dragstart="qrDrag = it.id" @dragover.prevent @drop.prevent="qrDrop(it.id)">
+          {{ it.label }}
+          <span class="x" title="移除" @click.stop="qr?.remove?.(it.value)">×</span>
+        </button>
+        <template v-if="qrAdding">
+          <input v-model="qrNew" class="qr-add-input" placeholder="新快捷回复" @keyup.enter="qrAdd" @keyup.esc="qrAdding = false" />
+          <button class="ghost tiny" @click="qrAdd">保存</button>
+        </template>
+        <button v-else class="qr-chip qr-add" title="添加快捷回复" @click="qrAdding = true">+ 添加</button>
+      </div>
     </div>
   </div>
 </template>
@@ -234,6 +286,11 @@ async function removeSticker(e: any) {
   font-size: 11px; line-height: 1; display: grid; place-items: center; cursor: pointer;
 }
 .cell-acts .ca.del:hover { background: var(--err); }
+/* 面板底部快捷回复条 */
+.sp-qr {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 12px; border-top: 1px solid var(--line); background: var(--card2);
+}
 /* 右键弹出的收藏按钮 */
 .fav-ask {
   position: absolute; inset: auto 4px 4px auto; z-index: 3;

@@ -66,7 +66,7 @@ export const groupAdminPlugin = {
       mountNeedPwd: false,
       mountError: '',
       mountHighlight: '',   // 挂载盘视图内「定位」高亮的文件名
-      dockTab: 'board' as 'board' | 'members' | 'tags' | 'search' | 'disk' | 'info' | 'all',  // 停靠栏页签
+      dockTab: 'all' as 'board' | 'members' | 'tags' | 'search' | 'disk' | 'info' | 'all',  // 停靠栏页签（默认全部看板）
       allBoards: [] as any[],    // 扫描到的所有会话看板
       scanProgress: 0,
       scanning: false,
@@ -468,7 +468,7 @@ export const groupAdminPlugin = {
               return b?.content ? { chat: c, board: b } : null
             } catch { return null }
           }))
-          for (const r of res) if (r) state.allBoards.push(r)
+          for (const r of res) if (r) state.allBoards.push({ ...r, open: true })   // 默认展开（用户：别压成纸片）
           state.scanProgress = Math.min(i + CONC, targets.length)
         }
         refreshBoardBots()

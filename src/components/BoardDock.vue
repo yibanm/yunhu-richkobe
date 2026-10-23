@@ -138,6 +138,21 @@ async function jumpToMsg(r: any) {
   ctx.ui?.toast?.('该消息不在最近 30 条内，已回到最新；可用「加载更多」往上翻', 'info')
 }
 
+/* ---- 成员「管理」小弹窗（禁言/设管理/标签/资料集中一处，行内不再平铺控件） ---- */
+const mgmt = ref<any>(null)
+function openMemberMgmt(m: any, e: MouseEvent) {
+  mgmt.value = mgmt.value?.id === m.id ? null : m
+  if (mgmt.value) {
+    setTimeout(() => {
+      const off = (ev: MouseEvent) => {
+        const wrap = (ev.target as HTMLElement)?.closest?.('.mm-wrap')
+        if (!wrap) { mgmt.value = null; document.removeEventListener('click', off) }
+      }
+      document.addEventListener('click', off)
+    }, 0)
+  }
+}
+
 /* ---- 群主管理：编辑群资料 / 消息自动删除 / 入群口令 ---- */
 const gEdit = reactive({ name: '', intro: '', autoDel: 0, keyword: '' })
 watch(() => g.state.info, (info) => {
@@ -244,7 +259,7 @@ const webdavUrl = computed(() =>
 function copyWebdav() {
   navigator.clipboard?.writeText(webdavUrl.value).then(
     () => ctx.ui?.toast('已复制 WebDAV 地址', 'success'),
-    () => window.prompt('复制地址：', webdavUrl.value))
+    () => navigator.clipboard.writeText(webdavUrl.value).then(() => ctx.ui?.toast?.('地址已复制', 'success')).catch(() => ctx.ui?.toast?.('复制失败', 'error')))
 }
 
 /** 把看板 HTML 净化后返回（多份看板共用） */
@@ -330,18 +345,26 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
           <li v-for="m in g.state.members" :key="m.id">
             <img :src="m.avatar ? resUrl(m.avatar) : fallbackAvatar(m.name)"
                  @error="(e: any) => (e.target.src = fallbackAvatar(m.name))" alt="" />
-            <span class="nm">{{ m.name }}</span>
+            <span class="nm" @click="g.openProfile(m)">{{ m.name }}</span>
             <em v-if="m.level >= 100" class="role owner">群主</em>
             <em v-else-if="m.level >= 2" class="role admin">管理员</em>
             <em v-if="m.isGag" class="role gag">已禁言</em>
             <span class="grow"></span>
-            <select class="gag-sel" @change="(e: any) => { if (e.target.value !== '') { g.gag(m, Number(e.target.value)); e.target.value = '' } }">
-              <option value="">禁言…</option>
-              <option v-for="o in g.GAG_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-            </select>
-            <button v-if="g.state.tags.length" class="ghost small" @click="g.setDockTab('tags'); g.openTagMember(m)">标签</button>
-            <button v-if="isOwner && m.level < 100" class="ghost small" :title="m.level >= 2 ? '取消管理员' : '设为管理员'"
-                    @click="setAdmin(m)">{{ m.level >= 2 ? '撤管理' : '设管理' }}</button>
+            <!-- 管理小弹窗：禁言/设管理/标签/资料（不再把控件平铺在行里） -->
+            <div class="mm-wrap">
+              <button class="ghost small" @click.stop="openMemberMgmt(m, $event)">管理</button>
+              <div v-if="mgmt?.id === m.id" class="mm-pop" @click.stop>
+                <select class="gag-sel" @change="(e: any) => { if (e.target.value !== '') { g.gag(m, Number(e.target.value)); e.target.value = ''; mgmt = null } }">
+                  <option value="">{{ m.isGag ? '解除禁言…' : '禁言…' }}</option>
+                  <option v-for="o in g.GAG_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+                </select>
+                <button v-if="isOwner && m.level < 100" class="ghost small" @click="setAdmin(m); mgmt = null">
+                  {{ m.level >= 2 ? '取消管理员' : '设为管理员' }}
+                </button>
+                <button v-if="g.state.tags.length" class="ghost small" @click="g.setDockTab('tags'); g.openTagMember(m); mgmt = null">打标签</button>
+                <button class="ghost small" @click="g.openProfile(m); mgmt = null">查看资料</button>
+              </div>
+            </div>
             <button class="ghost small danger" @click="g.kick(m)">踢出</button>
           </li>
           <li v-if="!g.state.members.length" class="dim center">
@@ -677,6 +700,15 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 .ginfo-name { font-size: 16px; font-weight: 600; }
 .gp-results .r-hit { cursor: pointer; border-radius: 8px; padding: 6px 8px; }
 .gp-results .r-hit:hover { background: color-mix(in srgb, var(--acc) 14%, transparent); }
+/* 成员「管理」小弹窗 */
+.mm-wrap { position: relative; }
+.mm-pop {
+  position: absolute; right: 0; top: 105%; z-index: 79; min-width: 150px;
+  display: flex; flex-direction: column; gap: 5px; padding: 8px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.mm-pop .gag-sel { width: 100%; }
 .gp-results .r-text { white-space: pre-wrap; word-break: break-word; }
 .ginfo-grid { display: flex; flex-direction: column; gap: 2px; }
 .ginfo-sec { font-size: 12px; color: var(--fg2); margin: 12px 0 6px; border-top: 1px solid var(--line); padding-top: 10px; }

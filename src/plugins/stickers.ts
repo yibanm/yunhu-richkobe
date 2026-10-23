@@ -72,18 +72,18 @@ export const stickersPlugin = {
     /** 点一张表情 → 作为表情消息发出 */
     async function send(e: any) {
       try {
-        // 官方协议实测（对照官方客户端发出的 type7 消息）：
-        //   · image（字段9）存**相对 key**，服务端据此拼 image_url；传完整 URL 会被二次拼接成坏地址
-        //   · 个人收藏 id 走 expression_id（字段15）；sticker_item_id（25）只用于表情包内贴纸
-        //   · width/height（33/34）官方会带，手机端排版用
+        // 官方协议实测：image（字段9）存**相对 key**；个人收藏 id 走 expression_id（15）；
+        // 表情包内贴纸走 sticker_item_id（25）+ sticker_pack_id（26，手机端按它归到合集）
         const u = e.urlOriginal || e.url || ''
         if (!u) { ui.toast('这张表情没有可用地址', 'warn'); return }
         const rel = String(u).replace(/^https?:\/\/[^/]+\//, '')
-        // 尺寸：面板里的 img 已加载，从 DOM 读 naturalWidth/Height（读不到就 0，服务端容忍）
-        let w = 0, hgt = 0
-        const imgEl = document.querySelector(`.sp .cell img[src*="${CSS.escape(rel.split('/').pop() || rel)}"]`) as HTMLImageElement | null
-        if (imgEl?.naturalWidth) { w = imgEl.naturalWidth; hgt = imgEl.naturalHeight }
-        await chat.sendMedia([h.sticker(rel, 0, 0, Number(e.id) || 0, w, hgt)])
+        const inPack = !!e.stickerPackId
+        await chat.sendMedia([h.sticker(
+          rel,
+          inPack ? Number(e.id) || 0 : 0,
+          inPack ? Number(e.stickerPackId) || 0 : 0,
+          inPack ? 0 : Number(e.id) || 0,
+        )])
         close()
       } catch (err: any) { ui.toast('发送失败：' + err.message, 'error') }
     }

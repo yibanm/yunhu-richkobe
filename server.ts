@@ -316,7 +316,10 @@ async function staticFile(res: http.ServerResponse, pathname: string): Promise<v
   if (!file.startsWith(ROOT) || !existsSync(file)) file = join(ROOT, 'index.html')
   try {
     const data = await readFile(file)
-    res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' })
+    // ⚠️ index.html 必须 no-store：否则浏览器缓存旧 html → 永远加载旧 hash 的 JS bundle，
+    //    表现为「服务端已修但用户界面不变」（多轮误判的根因）
+    const cc = extname(file) === '.html' ? 'no-store' : 'public, max-age=86400'
+    res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream', 'cache-control': cc })
     res.end(data)
   } catch { res.writeHead(404).end('404') }
 }

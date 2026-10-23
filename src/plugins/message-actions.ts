@@ -137,7 +137,7 @@ export const messageActionsPlugin = {
           ui.toast('已复制到剪贴板', 'success')
         } catch {
           // 非安全上下文没有 clipboard API，退化成 prompt
-          window.prompt('复制这段文本：', text)
+          await navigator.clipboard.writeText(text).then(() => ui.toast('已复制到剪贴板', 'success')).catch(() => ui.toast('复制失败', 'error'))
         }
       },
     }, ctx)
@@ -154,17 +154,6 @@ export const messageActionsPlugin = {
     }, ctx)
 
     chat.action('msg.select', { action: ({ msg }: any) => chat.startSelecting(msg.id) }, ctx)
-
-    /** 编辑：弹出输入框（带原文本），确认后调 /v1/msg/edit-message */
-    chat.action('msg.edit', {
-      action: async ({ msg }: any) => {
-        const old = msg.content?.text ?? ''
-        const next = window.prompt('编辑消息：', old)
-        if (next === null || next === old) return
-        try { await chat.edit(msg.id, next) }
-        catch (e: any) { ui.toast('编辑失败：' + e.message, 'error') }
-      },
-    }, ctx)
 
     /** 查看历史编辑内容 */
     chat.action('msg.history', {

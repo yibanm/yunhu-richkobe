@@ -61,20 +61,33 @@ async function saveNewPin() {
   ui?.toast?.('PIN 已设置，请牢记（手机不在身边时用它解锁）', 'info')
 }
 
-async function remoteUnlock() {
-  if (busy.value) return
-  busy.value = true
+/** 忘记密码：用账号密码或 token 验证身份后清除旧 PIN，重设新 PIN */
+const forgot = ref(false)
+const fEmail = ref('')
+const fPass = ref('')
+const fToken = ref('')
+const resetBusy = ref(false)
+async function forgotReset() {
+  if (resetBusy.value) return
+  resetBusy.value = true
   try {
-    await lock.requestRemoteUnlock()
-    ui?.toast?.('已向手机端发送解锁请求，请在手机上确认', 'info')
-  } finally { busy.value = false }
+    if (fToken.value.trim()) {
+      await auth.loginWithToken(fToken.value)     // token 校验失败会抛错
+    } else if (fEmail.value.trim() && fPass.value) {
+      await auth.login(fEmail.value.trim(), fPass.value)
+    } else {
+      err.value = '请填写账号密码或 token'
+      return
+    }
+    await lock.clearPin()                          // 身份验证通过 → 清旧 PIN
+    forgot.value = false
+    setting.value = true                           // 进入重设 PIN 流程
+    pin.value = ''; pin2.value = ''
+    ui?.toast?.('身份验证通过，请设置新 PIN', 'success')
+  } catch (e: any) {
+    err.value = '验证失败：' + (e?.message || '账号密码或 token 不正确')
+  } finally { resetBusy.value = false }
 }
-
-const statusText = computed(() => ({
-  waiting: '等待手机端确认…（手机 App 需在前台；在后台请打开手机端）',
-  denied: '手机端拒绝了本次解锁，可重试或用 PIN',
-  expired: '解锁请求已过期，请重新发起',
-}[status.value] || ''))
 </script>
 
 <template>
@@ -95,12 +108,11 @@ const statusText = computed(() => ({
         </div>
       </template>
 
-      <!-- 常规锁屏：PIN 键盘 + 手机解锁 -->
-      <template v-else>
+      <!-- 常规锁屏：PIN 键盘 + 忘记密码 -->
+      <template v-else-if="!forgot">
         <div v-if="!lock?.state?.hasPin" class="ls-hint">
           尚未设置 PIN ——
           <button class="ls-link" @click="setting = true">现在设置</button>
-          （或直接用手机解锁）
         </div>
         <div class="ls-dots">
           <span v-for="i in 6" :key="i" class="dot" :class="{ on: pin.length >= i }"></span>
@@ -114,11 +126,22 @@ const statusText = computed(() => ({
         </div>
         <div class="ls-row">
           <button class="ls-btn" :disabled="busy || pin.length < 4" @click="tryUnlock">解锁</button>
-          <button class="ls-btn" :disabled="busy || status === 'waiting'" @click="remoteUnlock">
-            <Icon name="phone" :size="14" /> 手机解锁
-          </button>
+          <button class="ls-btn" @click="forgot = true; err = ''">忘记密码</button>
         </div>
-        <div v-if="statusText" class="ls-status" :class="{ bad: status === 'denied' || status === 'expired' }">{{ statusText }}</div>
+      </template>
+
+      <!-- 忘记密码：账号密码或 token 验证身份 → 清旧 PIN → 重设 -->
+      <template v-else>
+        <div class="ls-hint">输入账号密码或 token 验证身份，通过后重设 PIN</div>
+        <input v-model="fEmail" class="ls-pin ls-text" placeholder="账号邮箱（用密码验证时填）" />
+        <input v-model="fPass" type="password" class="ls-pin ls-text" placeholder="账号密码" />
+        <div class="ls-or">或</div>
+        <input v-model="fToken" type="password" class="ls-pin ls-text" placeholder="Token（二选一）" />
+        <div v-if="err" class="ls-err">{{ err }}</div>
+        <div class="ls-row">
+          <button class="ls-btn" @click="forgot = false; err = ''">返回</button>
+          <button class="ls-btn primary" :disabled="resetBusy" @click="forgotReset">{{ resetBusy ? '验证中…' : '验证并重设' }}</button>
+        </div>
       </template>
     </div>
   </div>
@@ -166,6 +189,8 @@ const statusText = computed(() => ({
 }
 .ls-btn:hover { background: rgba(255, 255, 255, .14); }
 .ls-btn.primary { background: var(--acc); border-color: transparent; }
+.ls-text { letter-spacing: 0; text-align: left; font-size: 13px; }
+.ls-or { text-align: center; font-size: 11px; color: rgba(255, 255, 255, .45); margin: -4px 0; }
 .ls-status { font-size: 12px; color: rgba(255, 255, 255, .6); text-align: center; }
 .ls-status.bad { color: #ff9a9a; }
 </style>

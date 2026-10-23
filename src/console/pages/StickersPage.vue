@@ -29,17 +29,29 @@ function src(u: string) {
 async function importZip(ev: any) {
   const f = ev?.target?.files?.[0]
   if (!f) return
+  pendingZip.value = f
+  zipName.value = f.name.replace(/\.zip$/i, '')
+  ev.target.value = ''
+}
+/** zip 导入命名（内联输入，不用原生 prompt）：上传 → import-pack */
+const pendingZip = ref<File | null>(null)
+const zipName = ref('')
+const zipBusy = ref(false)
+async function confirmZipImport() {
+  const f = pendingZip.value
+  if (!f || zipBusy.value) return
+  zipBusy.value = true
   try {
     // zip 必须带 stickerZip/ 前缀（云湖约定）
     const res: any = await ctx.api.uploadFile(f, 'sticker')
     const key = typeof res === 'string' ? res : res?.key
     if (!key) throw new Error('上传没拿到 key')
-    const name = window.prompt('这个表情包叫什么？', f.name.replace(/\.zip$/i, '')) || f.name.replace(/\.zip$/i, '')
-    await ctx.api.stickerImportPack(name, key)
+    await ctx.api.stickerImportPack(zipName.value.trim() || f.name.replace(/\.zip$/i, ''), key)
     ctx.ui.toast('导入成功', 'success')
+    pendingZip.value = null
     await st.loadPacks()
   } catch (e: any) { ctx.ui.toast('导入失败：' + e.message, 'error') }
-  ev.target.value = ''
+  finally { zipBusy.value = false }
 }
 </script>
 
@@ -58,6 +70,12 @@ async function importZip(ev: any) {
         <label class="ghost small file">
           <input type="file" accept=".zip,application/zip" hidden @change="importZip" />导入 zip
         </label>
+        <!-- zip 导入命名（内联，不用原生 prompt） -->
+        <template v-if="pendingZip">
+          <input v-model="zipName" placeholder="表情包名称" style="max-width: 160px" />
+          <button class="small" :disabled="zipBusy || !zipName.trim()" @click="confirmZipImport">{{ zipBusy ? '导入中…' : '确认导入' }}</button>
+          <button class="ghost small" @click="pendingZip = null">取消</button>
+        </template>
       </div>
 
       <div class="packs">

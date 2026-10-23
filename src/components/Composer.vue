@@ -425,20 +425,6 @@ function fmtSize(n: number) {
       </span>
     </div>
 
-    <div v-if="qrItems.length || addingQr" class="qr-row">
-      <button v-for="it in qrItems" :key="it.id" class="qr-chip" draggable="true"
-              @click="onBar(it)"
-              @dragstart="onDragStart(it.id)" @dragover.prevent @drop.stop="onDropReorder(it.id, 'qr')">
-        {{ it.label }}
-        <span class="x" title="移除" @click.stop="quickreply?.remove?.(it.value)">×</span>
-      </button>
-      <template v-if="addingQr">
-        <input v-model="qrNew" class="qr-add-input" placeholder="新快捷回复" @keyup.enter="qrAdd" @keyup.esc="addingQr = false" />
-        <button class="ghost tiny" @click="qrAdd">保存</button>
-      </template>
-      <button v-else class="qr-chip qr-add" title="添加快捷回复" @click="addingQr = true">+ 添加</button>
-    </div>
-
     <!-- 待发送附件预览区：图片可点开发送前编辑，可写独立配文 -->
     <div v-if="pending.length" class="pending">
       <div v-for="p in pending" :key="p.id" class="pend" :class="{ wide: p.kind === 'image', err: !!p.error }">

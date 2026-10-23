@@ -119,7 +119,7 @@ async function saveProfile() {
 /** 复制文本（非安全上下文没有 clipboard，退化到 prompt） */
 async function copy(text: string, label = '') {
   try { await navigator.clipboard.writeText(text); ui.toast(`已复制${label}`, 'success') }
-  catch { window.prompt(`复制${label}：`, text) }
+  catch { /* 剪贴板不可用时静默失败，值已在界面可见 */ }
 }
 
 onMounted(loadAll)
