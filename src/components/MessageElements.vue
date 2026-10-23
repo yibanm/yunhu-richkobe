@@ -247,19 +247,21 @@ watch(() => props.elements, fix, { deep: true })
       </div>
       <audio v-else-if="el.type === 'audio'" :src="mediaUrl(el.attrs.src, 'audio')" controls preload="metadata" />
 
-      <!-- 文件 -->
-      <a v-else-if="el.type === 'file'" class="file" :href="mediaUrl(el.attrs.src, 'file')" target="_blank" rel="noreferrer"
-         :download="el.attrs.name || undefined">
-        <span class="fico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/></svg></span>
-        <span class="fmeta">
-          <b>{{ el.attrs.name || '文件' }}</b>
-          <small v-if="el.attrs.size">{{ (el.attrs.size / 1024).toFixed(1) }} KB</small>
-        </span>
-      </a>
-      <!-- 保存按钮：WebView2 里 <a download> 跨域不生效，走 fetch blob 强制下载 -->
-      <button v-if="el.type === 'file'" class="file-save" title="保存到本地" @click.stop="saveFile(el)">
-        <Icon name="download" :size="14" /> 保存
-      </button>
+      <!-- 文件（链接 + 保存按钮同属一个条件分支：⚠️ 必须用 template 包裹，
+           中间插 v-if 会截断 v-else-if 链，导致每条消息多渲染一个兜底 pre） -->
+      <template v-else-if="el.type === 'file'">
+        <a class="file" :href="mediaUrl(el.attrs.src, 'file')" target="_blank" rel="noreferrer"
+           :download="el.attrs.name || undefined">
+          <span class="fico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/></svg></span>
+          <span class="fmeta">
+            <b>{{ el.attrs.name || '文件' }}</b>
+            <small v-if="el.attrs.size">{{ (el.attrs.size / 1024).toFixed(1) }} KB</small>
+          </span>
+        </a>
+        <button class="file-save" title="保存到本地文件目录" @click.stop="saveFile(el)">
+          <Icon name="download" :size="14" /> 保存
+        </button>
+      </template>
 
       <!-- 云湖扩展 -->
       <button v-else-if="el.type === 'button'" class="msg-btn"
