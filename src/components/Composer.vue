@@ -110,12 +110,14 @@ const placeholder = computed(() => ({
   8: '<b>HTML</b> 消息，支持内联标签',
 }[kind.value]))
 
+/** 用户拖拽设定的输入框最小高度（0=跟随内容） */
+const manualMinH = ref(0)
 function autoresize() {
   const el = ta.value
   if (!el) return
   el.style.height = 'auto'
-  // 上限交给 CSS 的 max-height（40vh）钳制，这里不再写死像素
-  el.style.height = el.scrollHeight + 'px'
+  // 尊重用户手动拖拽的高度：输入只往上长，不缩回 scrollHeight
+  el.style.height = Math.max(el.scrollHeight, manualMinH.value) + 'px'
 }
 
 /* ---------------- 待发送附件（暂存预览，不直接发送） ----------------
@@ -308,6 +310,7 @@ function startResize(e: MouseEvent) {
   const startH = el ? el.getBoundingClientRect().height : 140
   const move = (ev: MouseEvent) => {
     const h = Math.max(taMinH, Math.min(startH + (startY - ev.clientY), window.innerHeight * 0.7))
+    manualMinH.value = h          // 记住拖拽高度，autoresize 不再缩回
     if (el) el.style.height = h + 'px'
   }
   const up = () => {
@@ -318,6 +321,7 @@ function startResize(e: MouseEvent) {
   window.addEventListener('mouseup', up)
 }
 function resetHeight() {
+  manualMinH.value = 0
   const el = ta.value
   if (el) { el.style.height = ''; autoresize() }
 }

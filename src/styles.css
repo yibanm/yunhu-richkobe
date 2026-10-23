@@ -235,7 +235,7 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 .chat-side { width: 292px; flex: 0 0 292px; border-right: 1px solid var(--line); background: var(--card); min-height: 0; }
 .chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* 群设置面板打开时聊天区让位（QQ 式挤压，不遮盖） */
-.chat-page.gp-open .chat-main { margin-right: 340px; }
+/* 群面板浮层不挤压聊天区（避免开/关跳动） */
 @media (max-width: 900px) { .chat-page.gp-open .chat-main { margin-right: 0; } }
 
 .sidebar { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; z-index: 60; }
@@ -373,14 +373,19 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
   opacity: .9;
 }
 .empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--fg2); text-align: center; }
-.row { display: flex; gap: 10px; max-width: min(78%, 720px); }
+.row { display: flex; gap: 8px; max-width: min(78%, 720px); }
 .row.right { align-self: flex-end; flex-direction: row-reverse; }
+/* 气泡贴近头像：msg-wrap 按左右对齐气泡/署名（己方贴右=贴头像，对方贴左=贴头像） */
+.msg-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.row.right .msg-wrap { align-items: flex-end; }
 .row img.av { width: 34px; height: 34px; border-radius: 50%; background: var(--card2); object-fit: cover; flex: 0 0 34px; }
 .bubble {
-  background: var(--bubble); padding: 9px 13px; border-radius: 12px 12px 12px 4px;
+  background: var(--bubble); padding: 9px 13px; border-radius: 12px;
   white-space: pre-wrap; word-break: break-word;
+  /* 气泡宽度随文本：不被 row 拉满（短文本不溢出成长条） */
+  align-self: flex-start; width: fit-content; max-width: 100%;
 }
-.row.right .bubble { background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #fff; border-radius: 12px 12px 4px 12px; }
+.row.right .bubble { background: var(--acc-soft); color: var(--fg); border-radius: 12px; align-self: flex-end; }
 .row.right .bubble a { color: #dbe8ff; }
 .meta { font-size: 11px; color: var(--fg2); margin-bottom: 4px; display: flex; gap: 6px; }
 .row.right .meta { justify-content: flex-end; }

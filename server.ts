@@ -92,7 +92,7 @@ app:
 plugins:
   config: {}
   theme:
-    preset: yunhu
+    preset: kobe
     accent: ''
     wallpaper: ''
     radius: 10
@@ -109,7 +109,7 @@ plugins:
   ws:
     heartbeat: 25000
   quickreply:
-    enabled: true
+    enabled: false
     items:
       - 收到 ✅
       - 稍等一下

@@ -10,6 +10,7 @@
 import { inject, ref, computed, onMounted, watch } from 'vue'
 import { resUrl } from '../core/res'
 import { fallbackAvatar } from '../core/util'
+import { renderRich } from '../core/render'
 import Icon from '../console/components/Icon.vue'
 
 const ctx = inject<any>('ctx')
@@ -88,6 +89,14 @@ async function toggleMute() {
   try { await ctx.api?.noNotify?.(cur.value.id, cur.value.type || 1, next) } catch { /* 本地已生效 */ }
 }
 
+/* 群看板（/v1/bot/board 内容）：默认 3 行，超长给展开提示 */
+const boardOpen = ref(false)
+const boardHtml = computed(() => {
+  const c = g.state.board?.content
+  return c ? renderRich(c) : ''
+})
+const boardLong = computed(() => (g.state.board?.content || '').length > 90)
+
 /* 群主判定（管理区可见性） */
 const isOwner = computed(() => {
   const me = ctx.auth?.state?.user?.id
@@ -109,13 +118,20 @@ async function setNotifyMode(v: number) {
   if (muted.value !== wantMute) await toggleMute()
 }
 
-/** 分享群：复制群号+群名到剪贴板 */
+/** 分享群：弹群二维码（/v1/share/create 返回二维码图 + 分享链接），供大家扫码进群 */
+const qrView = ref<{ url: string; shareUrl: string } | null>(null)
+const qrBusy = ref(false)
 async function shareGroup() {
   const c = cur.value
-  if (!c) return
-  const text = `${c.name}（群号 ${c.id}）`
-  try { await navigator.clipboard.writeText(text); ctx.ui?.toast?.('已复制分享文本', 'success') }
-  catch { ctx.ui?.toast?.('复制失败', 'error') }
+  if (!c || qrBusy.value) return
+  qrBusy.value = true
+  try {
+    const d = await ctx.api.shareCreate(c.id, c.type || 2, c.name || '')
+    if (!d.imageKey && !d.shareUrl) { ctx.ui?.toast?.('云端未返回二维码', 'warn'); return }
+    const u = d.imageKey ? (/^https?:/.test(d.imageKey) ? d.imageKey : resUrl(`https://chat-img.jwznb.com/${d.imageKey.replace(/^\/+/, '')}`)) : ''
+    qrView.value = { url: u, shareUrl: d.shareUrl || '' }
+  } catch (e: any) { ctx.ui?.toast?.('生成二维码失败：' + e.message, 'error') }
+  finally { qrBusy.value = false }
 }
 
 /** 删除聊天记录（本地缓存）：清当前会话消息与本地快照；云端记录不受影响（云湖无删记录端点） */
@@ -137,6 +153,56 @@ async function reportGroup() {
     await ctx.api.report(c.id, 2, c.name, '骚扰/违规内容')
     ctx.ui?.toast?.('举报已提交', 'success')
   } catch (e: any) { ctx.ui?.toast?.('举报失败：' + e.message, 'error') }
+}
+
+async function copyGroupId() {
+  const c = cur.value
+  if (!c) return
+  try { await navigator.clipboard.writeText(String(c.id)); ctx.ui?.toast?.('已复制群号 ' + c.id, 'success') }
+  catch { ctx.ui?.toast?.('复制失败', 'error') }
+}
+
+/* ---- 邀请好友/群聊：多选 + 筛选页签 + 确认框（/v1/group/invite 或发群号卡片文本） ---- */
+const invOpen = ref(false)
+const invBusy = ref(false)
+const invTab = ref<'friends' | 'groups'>('friends')
+const invSel = ref<Set<string>>(new Set())
+const friends = computed(() => (ctx.social?.state?.book?.users || []).filter((u: any) => u.id !== ctx.auth?.state?.user?.id))
+const groups = computed(() => (ctx.social?.state?.book?.groups || []).filter((g: any) => g.id !== cur.value?.id))
+const invList = computed(() => (invTab.value === 'friends' ? friends.value : groups.value))
+function openInvite() {
+  invSel.value = new Set()
+  invTab.value = 'friends'
+  invOpen.value = true
+  ctx.social?.loadBook?.()
+}
+function toggleInv(id: string) {
+  const s = new Set(invSel.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  invSel.value = s
+}
+async function sendInvite() {
+  const c = cur.value
+  const ids = [...invSel.value]
+  if (!c || !ids.length || invBusy.value) return
+  const isGroups = invTab.value === 'groups'
+  const label = isGroups ? '群聊' : '好友'
+  if (!(await ctx.ui?.confirm?.('发送邀请', `向 ${ids.length} 个${label}发送「${c.name}」的入群邀请（群号 ${c.id}）？`))) return
+  invBusy.value = true
+  try {
+    if (!isGroups) {
+      await ctx.api.inviteToGroup(c.id, ids)
+    } else {
+      // 发到群聊：把群号卡片文本发过去（云湖无跨群邀请端点，用消息承载）
+      for (const gid of ids) {
+        await ctx.api.send(gid, 2, 1, { text: `【入群邀请】${c.name}（群号 ${c.id}）欢迎加入！` })
+      }
+    }
+    ctx.ui?.toast?.('邀请已发送', 'success')
+    invOpen.value = false
+  } catch (e: any) { ctx.ui?.toast?.('邀请失败：' + e.message, 'error') }
+  finally { invBusy.value = false }
 }
 
 /* 成员右键菜单（QQ 式） */
@@ -219,14 +285,19 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
                  @error="(e: any) => (e.target.src = fallbackAvatar(m.name))" />
             <span>{{ (m.name || '').slice(0, 4) }}</span>
           </button>
-          <button class="gp-cell add" title="邀请成员" @click="g.setDockTab('members')">
+          <button class="gp-cell add" title="邀请好友入群" @click="openInvite">
             <Icon name="plus" :size="18" /><span>邀请</span>
           </button>
         </div>
 
-        <!-- 群公告 -->
-        <div class="gp-sec"><span>群公告</span></div>
-        <div class="gp-notice" @click="g.setDockTab('info')">{{ info?.introduction || '暂无公告' }} ›</div>
+        <!-- 群看板（原「群公告」位改显示看板内容；群简介只在群主编辑区出现，不重复） -->
+        <div class="gp-sec"><span>群看板</span>
+          <button v-if="boardLong" class="gp-link" @click="boardOpen = !boardOpen">
+            {{ boardOpen ? '收起' : '展开' }}
+          </button>
+        </div>
+        <div ref="boardBox" class="gp-notice rich" :class="{ open: boardOpen }"
+             v-html="boardHtml || '<span class=\'dim\'>暂无看板</span>'"></div>
 
         <!-- 我的本群昵称 -->
         <div class="gp-sec"><span>我的本群昵称</span></div>
@@ -300,6 +371,47 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
 
     <!-- 成员右键菜单（QQ 式，只含有后端的项） -->
     <Teleport to="body">
+      <!-- 邀请好友入群：多选好友 + 确认框（/v1/group/invite） -->
+      <div v-if="invOpen" class="qr-mask" @click.self="invOpen = false">
+        <div class="qr-box wide">
+          <div class="qr-head">
+            <b>邀请入群（已选 {{ invSel.size }}）</b>
+            <button class="gp-x" title="关闭" @click="invOpen = false">×</button>
+          </div>
+          <div class="inv-tabs">
+            <button class="sp-tab" :class="{ on: invTab === 'friends' }" @click="invTab = 'friends'; invSel = new Set()">好友</button>
+            <button class="sp-tab" :class="{ on: invTab === 'groups' }" @click="invTab = 'groups'; invSel = new Set()">群聊（发群号）</button>
+          </div>
+          <div class="inv-list">
+            <label v-for="u in invList" :key="u.id" class="inv-row">
+              <input type="checkbox" :checked="invSel.has(u.id)" @change="toggleInv(u.id)" />
+              <img :src="u.avatar ? resUrl(u.avatar) : fallbackAvatar(u.name)" alt="" />
+              <span>{{ u.name }}</span>
+            </label>
+            <p v-if="!invList.length" class="dim small">{{ invTab === 'friends' ? '通讯录里没有其他好友' : '没有其他群聊' }}</p>
+          </div>
+          <div class="gp-row">
+            <button class="ghost small" @click="invOpen = false">取消</button>
+            <button class="ghost small" :disabled="!invSel.size || invBusy" @click="sendInvite">发送邀请</button>
+          </div>
+        </div>
+      </div>
+      <!-- 群二维码弹窗（分享） -->
+      <div v-if="qrView" class="qr-mask" @click.self="qrView = null">
+        <div class="qr-box">
+          <div class="qr-head">
+            <b>群二维码 · {{ cur?.name }}</b>
+            <button class="gp-x" title="关闭" @click="qrView = null">×</button>
+          </div>
+          <img v-if="qrView.url" :src="qrView.url" alt="群二维码" class="qr-img" />
+          <p v-else class="dim small">云端未返回二维码图片</p>
+          <p class="dim small">扫码或复制群号 {{ cur?.id }} 加入本群</p>
+          <div class="gp-row">
+            <button class="ghost small" @click="copyGroupId">复制群号</button>
+            <a v-if="qrView.shareUrl" class="ghost small" :href="qrView.shareUrl" target="_blank" rel="noreferrer">打开分享页</a>
+          </div>
+        </div>
+      </div>
       <div v-if="mm.open" class="mm" :style="{ left: mm.x + 'px', top: mm.y + 'px' }" @click.stop>
         <button class="mm-item" @click="mmSend"><Icon name="send" :size="14" /> 发送消息</button>
         <button class="mm-item" @click="mmAt"><Icon name="quote" :size="14" /> @ TA</button>
@@ -339,8 +451,11 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
 .gp-cell.add { border: 1px dashed var(--line); }
 .gp-notice {
   font-size: 12.5px; color: var(--fg2); background: var(--card2); border-radius: 8px;
-  padding: 8px 10px; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  padding: 8px 10px; cursor: pointer; white-space: pre-wrap; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+.gp-notice.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.gp-more { font-style: normal; color: var(--acc); }
 .gp-row { display: flex; gap: 8px; align-items: center; }
 .gp-row input {
   flex: 1; min-width: 0; background: var(--card2); border: 1px solid var(--line);
@@ -382,6 +497,30 @@ onMounted(() => { if (isOpen.value && isGroup.value) g.loadMembers() })
   font-size: 13px; cursor: pointer;
 }
 .gp-clear:hover { background: color-mix(in srgb, var(--err) 22%, transparent); }
+/* 群二维码弹窗 */
+.qr-mask { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .5); display: grid; place-items: center; backdrop-filter: blur(3px); }
+.qr-box {
+  width: min(320px, 90vw); background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .5);
+}
+.qr-head { width: 100%; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.qr-img { width: 200px; height: 200px; object-fit: contain; background: #fff; border-radius: 10px; padding: 8px; }
+.qr-box.wide { width: min(380px, 92vw); align-items: stretch; }
+.inv-list { max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.inv-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;
+  font-size: 13px; cursor: pointer; color: var(--fg);
+}
+.inv-row:hover { background: var(--card2); }
+.inv-row img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--card2); }
+.inv-row input { width: auto; accent-color: var(--acc); }
+.inv-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.inv-tabs .sp-tab {
+  padding: 5px 12px 6px; border: none; background: none; color: var(--fg2);
+  font-size: 12.5px; cursor: pointer; border-bottom: 2px solid transparent;
+}
+.inv-tabs .sp-tab.on { color: var(--acc); border-bottom-color: var(--acc); font-weight: 600; }
 .mt { margin-top: 10px; }
 .gp-msglimit { display: flex; flex-direction: column; gap: 8px; }
 .gp-chips { display: flex; flex-wrap: wrap; gap: 6px; }

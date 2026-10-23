@@ -6,29 +6,31 @@
 import { inject, ref, computed, watch } from 'vue'
 
 const ctx = inject<any>('ctx')
-const ma = ctx.messageActions
-const chat = ctx.chat
+// ⚠️ 插槽组件 setup 早于 message-actions 插件装载时 ctx.messageActions 是 undefined，
+//    必须响应式取（computed），否则编辑弹窗永远打不开
+const ma = computed(() => ctx.messageActions)
+const chat = computed(() => ctx.chat)
 
 const text = ref('')
 const busy = ref(false)
 
 const msg = computed(() =>
-  chat?.state?.messages?.find((m: any) => m.id === ma?.state?.editingId) || null)
+  chat.value?.state?.messages?.find((m: any) => m.id === ma.value?.state?.editingId) || null)
 
-watch(() => ma?.state?.editingId, (id) => {
+watch(() => ma.value?.state?.editingId, (id) => {
   if (!id) return
-  const m = chat?.state?.messages?.find((x: any) => x.id === id)
+  const m = chat.value?.state?.messages?.find((x: any) => x.id === id)
   text.value = m?.content?.text || ''
 })
 
-function close() { ma.state.editingId = '' }
+function close() { ma.value.state.editingId = '' }
 
 async function save() {
   const v = text.value.trim()
   if (!v || busy.value) return
   busy.value = true
   try {
-    await chat.edit(ma.state.editingId, v)
+    await chat.value.edit(ma.value.state.editingId, v)
     close()
   } catch (e: any) {
     ctx.ui?.toast?.('编辑失败：' + e.message, 'error')

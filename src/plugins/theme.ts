@@ -81,7 +81,14 @@ button { color: #fff; text-shadow: 0 0 5px #ff33ff, 0 0 10px #ff33ff; }
 const NEON_BG_DARK = 'linear-gradient(45deg, #00009c, #9700ff, #d20076)'
 const NEON_BG_LIGHT = 'linear-gradient(45deg, #d8c7ff, #ffd6f5, #cfe3ff)'
 
+/** 旧默认「云湖蓝」存档/配置一律迁移到「科比紫」（用户指定新默认） */
+function migratePreset(p: string | undefined): string {
+  return p === 'yunhu' ? 'kobe' : (p || '')
+}
+
 export const PRESETS: ThemePreset[] = [
+  /* 默认主题（用户指定名）：M3 浅紫调，随明暗切换 */
+  { id: 'kobe', name: '科比紫', group: '内置', mode: 'dark', accent: '#d0bcff', bg: '#141218', rail: '#1d1b20', card: '#211f26' },
   { id: 'yunhu', name: '云湖蓝', group: '内置', mode: 'dark', accent: '#5a8cf8' },
   { id: 'midnight', name: '深夜紫', group: '内置', mode: 'dark', accent: '#a78bfa', bg: '#141225', rail: '#0d0b1a', card: '#1d1a33' },
   { id: 'forest', name: '森野绿', group: '内置', mode: 'dark', accent: '#34d399', bg: '#101a16', rail: '#0a1310', card: '#17241e' },
@@ -174,7 +181,7 @@ export const themePlugin = {
   apply(ctx: Context, config: any = {}) {
     const saved = JSON.parse(localStorage.getItem('yh.theme.pref') || 'null') || {}
     const state = reactive({
-      preset: saved.preset || config.preset || 'yunhu',
+      preset: migratePreset(saved.preset) || migratePreset(config.preset) || 'kobe',   // 旧默认「云湖蓝」迁移到「科比紫」
       accent: saved.accent || config.accent || '',
       wallpaper: saved.wallpaper || config.wallpaper || '',
       radius: saved.radius ?? config.radius ?? 10,

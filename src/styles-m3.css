@@ -2,58 +2,25 @@
    M3 质感层（Kazumi 式 Material 3 观感）
    -------------------------------------------------------------------
    只改「颜色 / 圆角 / 层级面 / 按钮形态」，不动布局、定位、z-index 梯度，
-   避免回归已修好的层叠与居中问题。变量在 :root 覆盖，组件类按名微调。
-   M3 面层级：surface < surface-container < surface-container-high < surface-container-highest
+   避免回归已修好的层叠与居中问题。
+   所有容器色由 --acc（当前主题强调色）派生 → 换主题时按钮/气泡/面板全联动；
+   页面底色（--bg/--rail/--card）仍由各主题预设决定，保持深色基调不动。
    =================================================================== */
 
-:root[data-theme='dark'] {
-  /* M3 dark tonal（baseline purple-blue，Kazumi 默认调性） */
-  --bg: #141218;              /* surface */
-  --rail: #1d1b20;            /* surface-container */
-  --card: #211f26;            /* surface-container */
-  --card2: #2b2930;           /* surface-container-high */
-  --line: #36343b;            /* outline-variant */
-  --line2: #4a4850;
-  --fg: #e6e0e9;              /* on-surface */
-  --fg2: #cac4d0;             /* on-surface-variant */
-  --acc: #d0bcff;             /* primary（dark 下是浅色） */
-  --acc2: #b69df8;
-  --acc-soft: #4a4458;        /* primary-container 系 */
-  --ok: #7ddc9a;
-  --warn: #ffb95c;
-  --err: #ffb4ab;
-  --bubble: #2b2930;
-  --m3-primary-container: #4f378b;
-  --m3-on-primary-container: #eaddff;
-  --m3-secondary-container: #4a4458;
-  --m3-on-secondary-container: #e8def8;
-  --m3-surface-highest: #36343b;
-  --shadow: 0 4px 16px rgba(0, 0, 0, .4);
+:root {
+  /* 由强调色派生的 M3 容器色：任何主题下都跟着变 */
+  --m3-primary-container: color-mix(in srgb, var(--acc) 18%, var(--card));   /* 己方气泡：淡紫（用户要求再淡一点） */
+  --m3-on-primary-container: var(--fg);
+  --m3-secondary-container: color-mix(in srgb, var(--acc) 18%, var(--card2));
+  --m3-on-secondary-container: var(--fg);
+  --m3-surface-highest: color-mix(in srgb, var(--acc) 10%, var(--card2));
   --radius: 16px;
 }
+:root[data-theme='dark'] {
+  --shadow: 0 4px 16px rgba(0, 0, 0, .4);
+}
 :root[data-theme='light'] {
-  --bg: #fef7ff;
-  --rail: #f3edf7;
-  --card: #f3edf7;
-  --card2: #eae2ec;
-  --line: #cac4d0;
-  --line2: #b8b2bf;
-  --fg: #1d1b20;
-  --fg2: #49454f;
-  --acc: #6750a4;
-  --acc2: #56408f;
-  --acc-soft: #eaddff;
-  --ok: #146c2e;
-  --warn: #7c5800;
-  --err: #b3261e;
-  --bubble: #eae2ec;
-  --m3-primary-container: #eaddff;
-  --m3-on-primary-container: #21005d;
-  --m3-secondary-container: #e8def8;
-  --m3-on-secondary-container: #1d192b;
-  --m3-surface-highest: #e6e0e9;
   --shadow: 0 2px 10px rgba(60, 40, 90, .12);
-  --radius: 16px;
 }
 
 /* ---------- M3 圆角体系 ---------- */
@@ -87,26 +54,50 @@ button.ghost.on, button.ghost.small.on, .bar-row .on, .gp-chips .on {
 .line > button:hover, .dlg-foot .primary:hover, .cf-btn.ok:hover { filter: brightness(1.06); }
 .line > button:disabled { background: var(--m3-surface-highest); color: var(--fg2); }
 
-/* ---------- 气泡 M3 化 ---------- */
-.bubble { border-radius: 18px; background: var(--bubble); }
-.bubble.right { background: var(--m3-primary-container); color: var(--m3-on-primary-container); }
+/* ---------- 气泡 M3 化（随主题变色；双方圆角一致 12px；宽度随文本） ---------- */
+.bubble { border-radius: 12px; background: var(--bubble); }
+.row.right .bubble { background: var(--m3-primary-container); color: var(--m3-on-primary-container); }
 /* 媒体消息（图 t2 / 表情 t7 / 视频 t10）不要容器底色，否则一大块色板裹着图；文件卡片保留容器色 */
 .bubble.t2, .bubble.t7, .bubble.t10 { background: transparent; }
-.bubble.right.t2, .bubble.right.t7, .bubble.right.t10 { background: transparent; color: var(--fg); }
+.row.right .bubble.t2, .row.right .bubble.t7, .row.right .bubble.t10 { background: transparent; color: var(--fg); }
 
 /* ---------- 卡片面层级 ---------- */
 .k-card, .ab-card, .mp-cell, .fn-chip { background: var(--card); border: 1px solid transparent; }
 .k-card:hover, .mp-cell:hover { background: var(--card2); }
 
-/* ---------- 侧栏会话行（M3 list） ---------- */
-.convs li { border-radius: 24px; margin: 2px 8px; padding: 10px 8px; }
+/* ---------- 会话列表圆角：只要一点点（用户指定） ---------- */
+.convs li { border-radius: 8px; margin: 1px 6px; padding: 9px 8px; }
 .convs li.active { background: var(--m3-secondary-container); }
 .convs li.active .cname { color: var(--m3-on-secondary-container); }
+
+/* ---------- 关闭类按钮统一：正圆 + 内容居中 ---------- */
+.gp-x, .sp-x, .post-x, .viewer-x, .pend-x, .mp-x, .dock-x {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg);
+  display: inline-grid; place-items: center; padding: 0; line-height: 1; font-size: 15px; cursor: pointer;
+}
+.gp-x:hover, .sp-x:hover, .post-x:hover, .viewer-x:hover, .pend-x:hover, .mp-x:hover, .dock-x:hover {
+  background: color-mix(in srgb, var(--err) 25%, transparent); color: var(--err);
+}
+
+/* ---------- 回最新：中性色正圆悬浮按钮（不用紫色底） ---------- */
+.jump-latest {
+  position: sticky; top: calc(100% - 60px); align-self: flex-end; margin-right: 14px;
+  width: 40px; height: 40px; aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg2);
+  display: grid; place-items: center; padding: 0; flex: 0 0 auto;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35); z-index: 5; cursor: pointer;
+}
+.jump-latest:hover { color: var(--acc); border-color: var(--acc); background: var(--card); filter: none; }
+
+/* ---------- 多行输入至少 3 行（群简介/备注/验证消息等） ---------- */
+textarea, .dlg-input:not(input), .gp-row textarea, .m-form textarea { min-height: 72px; resize: vertical; }
+.gp-notice { display: block; -webkit-line-clamp: unset; white-space: pre-wrap; max-height: 9em; overflow: auto; }
 
 /* ---------- 输入区 ---------- */
 .composer { background: var(--rail); border-top: none; }
 .composer textarea {
-  background: var(--card2); border: 1px solid transparent; border-radius: 24px 24px 6px 24px;
+  background: var(--card2); border: 1px solid transparent; border-radius: 12px;
   padding: 12px 16px 38px;
 }
 .composer textarea:focus { border-color: var(--acc); }
@@ -114,6 +105,7 @@ button.ghost.on, button.ghost.small.on, .bar-row .on, .gp-chips .on {
 /* ---------- 标题栏 ---------- */
 .chat-header { background: var(--rail); border-bottom: none; }
 
-/* ---------- 滚动条 M3 ---------- */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 999px; }
+/* ---------- 滚动条：常规形态（8px 宽、小圆角，不做细椭圆） ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--acc) 45%, var(--line2)); }

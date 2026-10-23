@@ -103,6 +103,41 @@ async function setAdmin(m: any) {
   } catch (e: any) { ctx.ui?.toast?.('设置失败：' + e.message, 'error') }
 }
 
+/** 搜索结果点击跳转：三段回退（本地已有→messagesAround→重载全量），并置「回到最新」入口 */
+async function jumpToMsg(r: any) {
+  const cur = chat.state.current
+  if (!cur || !r?.id) return
+  g.closeDock()
+  const highlight = () => nextTick(() => {
+    const el = document.querySelector(`[data-mid="${r.id}"]`) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.classList.add('flash')
+      setTimeout(() => el.classList.remove('flash'), 1500)
+    }
+  })
+  // ① 本地消息区已有这条 → 直接高亮
+  if (chat.state.messages.some((m: any) => m.id === r.id)) {
+    chat.state.jumpedAway = true
+    highlight()
+    return
+  }
+  // ② 拉该消息前后上下文
+  try {
+    const around = await ctx.api.messagesAround(cur.id, cur.type, r.id, 30)
+    if (around.length) {
+      chat.state.messages = around
+      chat.state.jumpedAway = true
+      highlight()
+      return
+    }
+  } catch { /* 落到 ③ */ }
+  // ③ 兜底：重载最新消息列表并提示（不静默失败）
+  await chat.loadMessages(true)
+  chat.state.jumpedAway = false
+  ctx.ui?.toast?.('该消息不在最近 30 条内，已回到最新；可用「加载更多」往上翻', 'info')
+}
+
 /* ---- 群主管理：编辑群资料 / 消息自动删除 / 入群口令 ---- */
 const gEdit = reactive({ name: '', intro: '', autoDel: 0, keyword: '' })
 watch(() => g.state.info, (info) => {
@@ -325,7 +360,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
           <button class="small" :disabled="g.state.searching" @click="g.doSearch()">搜索</button>
         </div>
         <ul class="gp-results">
-          <li v-for="r in g.state.results" :key="r.id">
+          <li v-for="r in g.state.results" :key="r.id" class="r-hit" title="点击跳转到该消息" @click="jumpToMsg(r)">
             <div class="r-top"><b>{{ r.sender }}</b><span class="dim small">{{ fmtTime(r.ts) }}</span></div>
             <div class="r-text">{{ r.text || '[非文本]' }}</div>
           </li>
@@ -356,7 +391,7 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
             <div class="ginfo-sec">群主管理</div>
             <div class="ginfo-row">
               <input v-model="gEdit.name" placeholder="群名称" />
-              <input v-model="gEdit.intro" placeholder="群公告/简介" />
+              <textarea v-model="gEdit.intro" rows="3" placeholder="群公告/简介（可多行编辑）"></textarea>
               <button class="ghost small" @click="saveGroupEdit">保存群资料</button>
             </div>
             <div class="ginfo-row">
@@ -572,14 +607,12 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
   z-index: 75; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, .5);
   display: flex; flex-direction: column; overflow: hidden;
-  animation: dock-in .16s ease-out;
 }
 .dock-x {
   width: 26px; height: 26px; padding: 0; border-radius: 7px; font-size: 17px; line-height: 1;
   display: grid; place-items: center; flex: 0 0 auto;
 }
 .dock-x:hover { background: var(--card2); color: var(--err); }
-@keyframes dock-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 .dock-head {
   display: flex; align-items: center; gap: 10px; padding: 12px 18px; font-size: 13px;
   border-bottom: 1px solid var(--line); background: var(--card);
@@ -642,6 +675,9 @@ function boardHtmlOf(b: any) { return b?.content ? renderRich(b.content) : '' }
 .ginfo-top { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
 .ginfo-top img { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; background: var(--card2); }
 .ginfo-name { font-size: 16px; font-weight: 600; }
+.gp-results .r-hit { cursor: pointer; border-radius: 8px; padding: 6px 8px; }
+.gp-results .r-hit:hover { background: color-mix(in srgb, var(--acc) 14%, transparent); }
+.gp-results .r-text { white-space: pre-wrap; word-break: break-word; }
 .ginfo-grid { display: flex; flex-direction: column; gap: 2px; }
 .ginfo-sec { font-size: 12px; color: var(--fg2); margin: 12px 0 6px; border-top: 1px solid var(--line); padding-top: 10px; }
 .ginfo-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }

@@ -99,6 +99,14 @@ function jumpTo(mid: string) {
 
 function toBottom() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
 
+/** 搜索跳转历史后一键回最新：重载最新消息并滚到底 */
+async function backLatest() {
+  chat.state.jumpedAway = false
+  showJump.value = false
+  await chat.loadMessages()
+  toBottom()
+}
+
 /** 滚动时上报「是否贴底」：新消息/轮询刷新只在贴底时自动滚，翻历史不被打断 */
 let loadingTop = false
 const showJump = ref(false)   // 离开底部时显示「回最新」箭头
@@ -159,6 +167,10 @@ watch(() => cur.value?.id, toBottom)
       <span class="dot wait" :title="'连接状态：' + ctx.ws.state.status + '（点击重连）'"
             style="cursor:pointer" @click="ctx.ws.reconnect()"></span>
     </div>
+    <!-- 搜索跳转到历史后：顶栏常驻「回到最新」入口（滚不动也能回） -->
+    <button v-if="chat.state.jumpedAway" class="ghost small back-latest" @click="backLatest">
+      <Icon name="down" :size="13" /> 回到最新
+    </button>
 
     <!-- 云湖公开接口没有通话/投屏端点 —— 按「无后端即砍」原则不放占位按钮 -->
 

@@ -719,7 +719,9 @@ export const apiPlugin = {
             isVip: pb.bool(info, 6),
             level: pb.num(d, 3),
             gagTs: pb.num(d, 4),
-            isGag: pb.bool(d, 5),
+            // ⚠️ isGag 的布尔字段号不可靠（实测全员 true 的猎奇显示）；
+            //    改按 gagTs（禁言到期时间戳）判定：未来时间才是在禁言中
+            isGag: pb.num(d, 4) > Date.now(),
             role: pb.num(d, 3) >= 100 ? '群主' : pb.num(d, 3) >= 2 ? '管理员' : '成员',
           }
         })
@@ -784,13 +786,15 @@ export const apiPlugin = {
         })
         assertOk(r)
         const list = r.json?.data?.list || []
+        // 实测响应字段：content 是**字符串**（非对象）、发送者=name、时间=time、type 是字符串
         return list.map((m: any) => ({
-          id: m.msgId || m.id,
-          sender: m.senderName || m.userName || m.name || '',
+          id: m.id || m.msgId,
+          sender: m.name || m.senderName || '',
           avatar: m.avatarUrl,
-          text: m.text || m.content?.text || '',
-          ts: m.timestamp || m.sendTime || 0,
-          type: m.contentType ?? 1,
+          text: typeof m.content === 'string' ? m.content : (m.content?.text || ''),
+          ts: m.time || m.timestamp || 0,
+          type: Number(m.type) || 1,
+          seq: m.sequence,
           raw: m,
         }))
       },
@@ -1022,6 +1026,12 @@ export const apiPlugin = {
       /** 举报用户/群/机器人（/v1/report/create） */
       async report(chatId: string, chatType: number, chatName: string, content: string) {
         return assertOk(await request('/v1/report/create', { body: { chatId, chatType, chatName, content } }))
+      },
+      /** 创建分享（含群二维码图 imageKey + shareUrl）：JSON {chatId, chatType, chatName} */
+      async shareCreate(chatId: string, chatType: number, chatName: string) {
+        const r = assertOk(await request('/v1/share/create', { body: { chatId, chatType, chatName } }))
+        const d = r.json?.data || {}
+        return { imageKey: d.imageKey || '', key: d.key || '', shareUrl: d.shareUrl || '' }
       },
 
       /** 编辑群聊信息（只传要改的字段） */

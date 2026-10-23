@@ -9,6 +9,7 @@
  */
 import { inject, computed, ref, watch, onUnmounted } from 'vue'
 import { resUrl } from '../core/res'
+import Icon from '../console/components/Icon.vue'
 
 const ctx = inject<any>('ctx')
 const st = ctx.stickers
@@ -75,7 +76,21 @@ watch(() => s.panelOpen, (v) => {
 })
 onUnmounted(() => document.removeEventListener('paste', onPaste))
 
-/** 外来表情包里的表情：右键直接加进个人收藏（url 已是云端地址，直接 expression/create） */
+/** 外来表情包里的表情：右键弹出「收藏」按钮，点按钮才收藏（QQ 式两段交互） */
+const favAsk = ref<any>(null)
+function askFav(e: any, ev: MouseEvent) {
+  favAsk.value = e
+  // 点面板其它地方收起
+  setTimeout(() => {
+    const off = () => { favAsk.value = null; document.removeEventListener('click', off) }
+    document.addEventListener('click', off)
+  }, 0)
+  ev.stopPropagation()
+}
+async function doFav(e: any) {
+  favAsk.value = null
+  await favFromPack(e)
+}
 async function favFromPack(e: any) {
   const u = e.urlOriginal || e.url || ''
   if (!u) { ctx.ui?.toast?.('这张表情没有可用地址', 'warn'); return }
@@ -162,10 +177,14 @@ async function removeSticker(e: any) {
             </button>
           </template>
           <template v-else>
-            <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送 · 右键添加到收藏'"
-                    @click="st.send(e)" @contextmenu.prevent="favFromPack(e)">
+            <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送 · 右键弹出收藏按钮'"
+                    @click="st.send(e)" @contextmenu.prevent="askFav(e, $event)">
               <img :src="src(e)" loading="lazy" alt=""
                    @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
+              <!-- 右键后弹出的「收藏」小按钮（QQ 式：右键不直接收藏，先出按钮再点） -->
+              <span v-if="favAsk?.id === e.id" class="fav-ask" @click.stop="doFav(e)">
+                <Icon name="star" :size="13" /> 收藏
+              </span>
               <span class="cell-acts">
                 <span class="ca" title="重命名" @click.stop="renameSticker(e)">✎</span>
                 <span class="ca del" title="从包中删除" @click.stop="removeSticker(e)">×</span>
@@ -215,6 +234,14 @@ async function removeSticker(e: any) {
   font-size: 11px; line-height: 1; display: grid; place-items: center; cursor: pointer;
 }
 .cell-acts .ca.del:hover { background: var(--err); }
+/* 右键弹出的收藏按钮 */
+.fav-ask {
+  position: absolute; inset: auto 4px 4px auto; z-index: 3;
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--acc); color: #fff; font-size: 11px;
+  padding: 3px 8px; border-radius: 999px; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .4);
+}
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
 .cell { position: relative; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 9px; background: var(--card2); padding: 4px; cursor: pointer; overflow: hidden; }
 .cell:hover { border-color: var(--acc); }

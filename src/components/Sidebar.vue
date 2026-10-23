@@ -277,13 +277,6 @@ async function dlgOk() {
         <button class="rm-item" @click="copyId"><Icon name="copy" :size="14" /> 复制群号/ID</button>
         <button class="rm-item" @click="markUnread"><Icon name="chat" :size="14" /> 标记未读</button>
         <div class="rm-sep"></div>
-        <div class="rm-item dim small" style="cursor:default">移动到分组</div>
-        <button v-if="chat.groupOf(menu.conv?.id)" class="rm-item" @click="assignTo('')"><Icon name="undo" :size="14" /> 移出分组</button>
-        <button v-for="g in chat.groups.groups" :key="g.id" class="rm-item"
-                :class="{ on: chat.groupOf(menu.conv?.id) === g.id }" @click="assignTo(g.id)">
-          <Icon name="folder" :size="14" /> {{ g.name }}
-        </button>
-        <div class="rm-sep"></div>
         <button class="rm-item danger" @click="delConv"><Icon name="trash" :size="14" /> 删除会话</button>
       </div>
     </Teleport>

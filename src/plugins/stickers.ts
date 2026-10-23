@@ -105,13 +105,15 @@ export const stickersPlugin = {
         const res: any = await api.uploadFile(f, 'image')
         const key = typeof res === 'string' ? res : res?.key
         if (!key) throw new Error('上传没拿到 key')
-        // ⚠️ 收藏/表情包接口要的都是**完整图片 URL**（不是裸 key）
+        // ⚠️ 两个接口 url 形态不同（官方模型注释实测）：
+        //   · expression/create（收藏）要**完整 URL**
+        //   · sticker/add-sticker（表情包内贴纸）要**相对 key**——手机端自己补域名，传全 URL 会二次拼接导致不识别
         const url = res?.url || `https://chat-img.jwznb.com/${key}`
         // 文件名过长直接截短（保留扩展名）：云湖/七牛对 key 长度有限制，长文件名会上传失败
         const ext = (f.name.split('.').pop() || 'png').slice(0, 8)
         const base = f.name.replace(/\.\w+$/, '').slice(0, 24) || 'sticker'
         if (target === 'fav') await api.expressionCreate(url)
-        else await api.stickerAddSticker(target as number, `${base}.${ext}`, url)
+        else await api.stickerAddSticker(target as number, `${base}.${ext}`, key)
         ui.toast(target === 'fav' ? '已加入表情收藏' : '已加入表情包', 'success')
         await load()
         if (target !== 'fav') await loadPacks()

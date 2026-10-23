@@ -85,15 +85,37 @@ function ratioOf(el: Element) {
 
 /** 点击图片/视频 → 页内灯箱查看（QQ 式），点空白处收起 */
 const viewer = ref<{ kind: 'image' | 'video'; url: string } | null>(null)
+const viewerVideo = ref<HTMLVideoElement | null>(null)
+const zoom = ref(1)
+const pan = ref({ x: 0, y: 0 })
 function openRaw(src: string) {
   const u = resUrl(src)
-  if (u) viewer.value = { kind: 'image', url: u }
+  if (u) { viewer.value = { kind: 'image', url: u }; zoom.value = 1; pan.value = { x: 0, y: 0 } }
 }
 function openVideo(src: string) {
   const u = mediaUrl(src, 'video')
-  if (u) viewer.value = { kind: 'video', url: u }
+  if (u) { viewer.value = { kind: 'video', url: u }; zoom.value = 1; pan.value = { x: 0, y: 0 } }
 }
 function closeViewer() { viewer.value = null }
+/** 滚轮缩放（以 1.25 步进，限 0.2–8 倍） */
+function onWheel(e: WheelEvent) {
+  if (!viewer.value || viewer.value.kind !== 'image') return
+  zoom.value = Math.min(8, Math.max(0.2, zoom.value * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))
+}
+/** 拖拽平移（放大后看局部） */
+function startPan(e: MouseEvent) {
+  if (zoom.value <= 1) return
+  const sx = e.clientX, sy = e.clientY
+  const ox = pan.value.x, oy = pan.value.y
+  const move = (ev: MouseEvent) => { pan.value = { x: ox + ev.clientX - sx, y: oy + ev.clientY - sy } }
+  const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
+  window.addEventListener('mousemove', move)
+  window.addEventListener('mouseup', up)
+}
+/** 视频应用内全屏（requestFullscreen，不跳外部播放器） */
+function fullVideo() {
+  viewerVideo.value?.requestFullscreen?.().catch(() => {})
+}
 
 /** 文章卡片：页内弹窗看正文（markdown/HTML 净化渲染） */
 const postView = ref<any>(null)
@@ -242,12 +264,25 @@ watch(() => props.elements, fix, { deep: true })
     </template>
   </div>
 
-  <!-- 图片/视频灯箱：点空白处收起 -->
+  <!-- 图片/视频灯箱：点空白收起；图片滚轮缩放+拖拽平移；视频可应用内全屏 -->
   <Teleport to="body">
-    <div v-if="viewer" class="viewer-mask" @click.self="closeViewer">
-      <img v-if="viewer.kind === 'image'" :src="viewer.url" alt="" @click.self="closeViewer" />
-      <video v-else :src="viewer.url" controls autoplay @click.self="closeViewer"></video>
-      <button class="viewer-x" title="关闭" @click="closeViewer">×</button>
+    <div v-if="viewer" class="viewer-mask" @click.self="closeViewer" @wheel.prevent="onWheel">
+      <img v-if="viewer.kind === 'image'" :src="viewer.url" alt=""
+           :style="{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }"
+           class="viewer-img" @click.self="closeViewer"
+           @mousedown.prevent="startPan" @dblclick="zoom = zoom > 1 ? 1 : 2" />
+      <video v-else ref="viewerVideo" :src="viewer.url" controls autoplay @click.self="closeViewer"></video>
+      <div class="viewer-bar">
+        <template v-if="viewer.kind === 'image'">
+          <button class="viewer-ctl" title="缩小" @click="zoom = Math.max(0.2, zoom / 1.25)">−</button>
+          <span class="viewer-zoom">{{ Math.round(zoom * 100) }}%</span>
+          <button class="viewer-ctl" title="放大" @click="zoom = Math.min(8, zoom * 1.25)">＋</button>
+          <button class="viewer-ctl" title="还原" @click="zoom = 1; pan = { x: 0, y: 0 }">1:1</button>
+        </template>
+        <button v-else class="viewer-ctl" title="应用内全屏播放" @click="fullVideo">全屏</button>
+        <span class="grow"></span>
+        <button class="viewer-ctl" title="关闭" @click="closeViewer">×</button>
+      </div>
     </div>
     <!-- 文章弹窗：标题 + 净化渲染正文，右上 × 关闭 -->
     <div v-if="postView" class="post-mask" @click.self="closePost">
@@ -289,17 +324,27 @@ watch(() => props.elements, fix, { deep: true })
 .viewer-mask {
   position: fixed; inset: 0; z-index: 92; background: rgba(0, 0, 0, .82);
   display: grid; place-items: center; cursor: zoom-out; backdrop-filter: blur(3px);
+  overflow: hidden;
 }
+.viewer-img { transition: transform .08s linear; cursor: grab; }
 .viewer-mask img, .viewer-mask video {
-  max-width: 92vw; max-height: 90vh; border-radius: 8px; cursor: zoom-out;
+  max-width: 92vw; max-height: 86vh; border-radius: 8px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
 }
-.viewer-x {
-  position: absolute; top: 16px; right: 18px; width: 34px; height: 34px;
-  border-radius: 50%; border: none; background: rgba(255, 255, 255, .14); color: #fff;
-  font-size: 20px; line-height: 1; cursor: pointer;
+.viewer-bar {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  background: rgba(20, 20, 24, .8); border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 999px; backdrop-filter: blur(8px);
 }
-.viewer-x:hover { background: rgba(255, 255, 255, .26); }
+.viewer-bar .grow { flex: 1; }
+.viewer-ctl {
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 50%; border: none;
+  background: rgba(255, 255, 255, .12); color: #fff; font-size: 15px; line-height: 1;
+  display: inline-grid; place-items: center; cursor: pointer;
+}
+.viewer-ctl:hover { background: rgba(255, 255, 255, .24); }
+.viewer-zoom { color: rgba(255, 255, 255, .8); font-size: 12px; min-width: 42px; text-align: center; }
 .sticker { max-width: 96px; max-height: 96px; display: block; object-fit: contain; }
 .video-wrap { display: inline-flex; flex-direction: column; gap: 3px; }
 .vtime { font-size: 11px; color: var(--fg2); }
