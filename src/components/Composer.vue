@@ -215,6 +215,25 @@ onUnmounted(() => {
   window.removeEventListener('drop', winDrop)
 })
 
+/* ---- Tauri 桌面端拖放：监听 tauri://drag-drop 拿本地路径，经 /local-read 转 File 进暂存 ---- */
+let offTauriDrop: (() => void) | null = null
+async function stageLocalPath(p: string) {
+  try {
+    const r = await fetch('/local-read?path=' + encodeURIComponent(p), { headers: { token: ctx.api?.token || '' } })
+    if (!r.ok) { ctx.ui?.toast?.('读取拖入文件失败：HTTP ' + r.status, 'error'); return }
+    const name = decodeURIComponent(r.headers.get('x-file-name') || p.split(/[\\/]/).pop() || 'file')
+    const blob = await r.blob()
+    stage(new File([blob], name, { type: blob.type || 'application/octet-stream' }))
+  } catch (e: any) { ctx.ui?.toast?.('读取拖入文件失败：' + e.message, 'error') }
+}
+const w = window as any
+if (w.__TAURI__?.event?.listen) {
+  w.__TAURI__.event.listen('tauri://drag-drop', (ev: any) => {
+    for (const p of ev?.payload?.paths || []) stageLocalPath(p)
+  }).then((off: () => void) => { offTauriDrop = off })
+}
+onUnmounted(() => { offTauriDrop?.() })
+
 /* ---- 发送前图片编辑（裁剪/旋转/翻转） ---- */
 const editing = ref<Pending | null>(null)
 function openEditor(p: Pending) { if (p.kind === 'image') editing.value = p }

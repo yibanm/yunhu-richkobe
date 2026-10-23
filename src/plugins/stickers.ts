@@ -73,14 +73,16 @@ export const stickersPlugin = {
     /** 点一张表情 → 作为表情消息发出 */
     async function send(e: any) {
       try {
-        // 官方协议实测：image（字段9）存**相对 key**；个人收藏 id 走 expression_id（15）；
-        // 表情包内贴纸走 sticker_item_id（25）+ sticker_pack_id（26，手机端按它归到合集）
+        // 字段形态实测结论（两轮用户真机反馈修正）：
+        //   · 字段 9（sticker_url/image）：手机端**直接当图片地址读**，必须发完整 URL（发相对 key 手机加载不了）
+        //   · 字段 3（image_url）：显式发完整 URL，防止服务端拿字段 9 二次拼接污染字段 3
+        //   · 收藏 id 走 expression_id(15)；包内贴纸走 sticker_item_id(25)+sticker_pack_id(26)
         const u = e.urlOriginal || e.url || ''
         if (!u) { ui.toast('这张表情没有可用地址', 'warn'); return }
-        const rel = String(u).replace(/^https?:\/\/[^/]+\//, '')
+        const full = /^https?:\/\//i.test(u) ? u : `https://chat-img.jwznb.com/${String(u).replace(/^\/+/, '')}`
         const inPack = !!e.stickerPackId
         await chat.sendMedia([h.sticker(
-          rel,
+          full,
           inPack ? Number(e.id) || 0 : 0,
           inPack ? Number(e.stickerPackId) || 0 : 0,
           inPack ? 0 : Number(e.id) || 0,

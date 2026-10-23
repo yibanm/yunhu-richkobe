@@ -142,10 +142,6 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 }
 .rail-btn:hover { background: var(--card2); color: var(--fg); }
 .rail-btn.on { background: var(--acc-soft); color: var(--acc); }
-.rail-btn.on::before {
-  content: ''; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 3px;
-  border-radius: 0 3px 3px 0; background: var(--acc);
-}
 
 /* position: relative —— 群看板/群文件那层浮层要以它为定位父级，
    这样浮层只在「右侧内容区」里铺开，不会盖到左边导航栏，导航栏也不用悬浮 */

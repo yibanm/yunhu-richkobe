@@ -1,0 +1,21 @@
+[package]
+name = "yunhulaoda-desktop"
+version = "1.0.3"
+description = "云湖牢大版桌面客户端（Tauri 壳 + Node sidecar 服务）"
+authors = ["yibanm"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

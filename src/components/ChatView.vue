@@ -88,13 +88,33 @@ async function pickMenu(item: any) {
   catch (e: any) { ctx.ui?.toast('操作失败：' + e.message, 'error') }
 }
 
-/** 点引用跳到被引用的消息 */
-function jumpTo(mid: string) {
-  const el = document.querySelector(`[data-mid="${mid}"]`) as HTMLElement | null
-  if (!el) { ctx.ui?.toast('被引用的消息不在当前已加载的记录里', 'warn'); return }
-  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  el.classList.add('flash')
-  setTimeout(() => el.classList.remove('flash'), 1200)
+/** 点引用跳到被引用的消息（含窗口外：messagesAround 拉上下文后高亮） */
+async function jumpTo(mid: string) {
+  const cur = chat.state.current
+  if (!cur || !mid) return
+  const highlight = () => nextTick(() => {
+    const el = document.querySelector(`[data-mid="${mid}"]`) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.classList.add('flash')
+      setTimeout(() => el.classList.remove('flash'), 2000)
+    }
+  })
+  // ① 本地已有
+  if (chat.state.messages.some((m: any) => m.id === mid)) { highlight(); return }
+  // ② 拉被引用消息的上下文窗口（seq 未知传 -1=uint64max，官方语义）
+  try {
+    const around = await ctx.api.messagesAround(cur.id, cur.type, mid, 30, -1)
+    if (around.length && around.some((m: any) => m.id === mid)) {
+      chat.state.messages = around
+      chat.state.jumpedAway = true
+      chat.state.locateId = mid
+      highlight()
+      return
+    }
+  } catch { /* 落到 ③ */ }
+  // ③ 兜底提示
+  ctx.ui?.toast('被引用的消息拉取失败或已删除', 'warn')
 }
 
 function toBottom() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }

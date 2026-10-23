@@ -121,8 +121,16 @@ export const wsPlugin = {
     function scheduleRetry(err?: any) {
       retry = Math.min(retry + 1, 6)
       const delay = Math.min(1500 * retry, 15000)
-      state.status = 'retry'
       if (err) state.error = err.message || String(err)
+      // 重连次数封顶后不再显示「重连中」：转 closed（轮询兜底照常工作），
+      // 否则 status 永远停在 retry，用户看到「一直重连中」
+      if (retry >= 6) {
+        state.status = 'closed'
+        state.error = (state.error || '') + '（重连已达上限，消息走轮询兜底；点状态点可手动重连）'
+        log('重连达上限，转轮询兜底')
+        return
+      }
+      state.status = 'retry'
       log(`${delay}ms 后重连（第 ${retry} 次）`)
       clearTimeout(retryTimer)
       retryTimer = setTimeout(connect, delay)

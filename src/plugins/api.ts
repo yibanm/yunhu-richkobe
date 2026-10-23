@@ -1041,6 +1041,14 @@ export const apiPlugin = {
         const d = r.json?.data || {}
         return { imageKey: d.imageKey || '', key: d.key || '', shareUrl: d.shareUrl || '' }
       },
+      /** 关注板块：{ baId, followSource=2 }（Yhchat 实测形态） */
+      async followBoard(baId: number) {
+        return assertOk(await request('/v1/community/ba/user-follow-ba', { body: { baId, followSource: 2 } }))
+      },
+      /** 取消关注板块：{ baId } */
+      async unfollowBoard(baId: number) {
+        return assertOk(await request('/v1/community/ba/user-unfollow-ba', { body: { baId } }))
+      },
 
       /** 编辑群聊信息（只传要改的字段） */
       async editGroup(groupId: string, patch: Record<string, any>) {

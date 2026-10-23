@@ -30,6 +30,7 @@ export class ConsoleService extends Service {
       menus: {},        // 菜单表
       entries: [],      // 客户端入口
       settings: [],     // 用户设置（对标 Koishi ctx.settings，与插件配置分离）
+      currentPage: '',  // 当前页（Console.vue 双向绑定；goto 写这里才生效）
     })
     this.listeners = new Map()
   }
@@ -155,7 +156,10 @@ export class ConsoleService extends Service {
    */
   goto(path: string) {
     const hit = (this.state.pages || []).find((p: any) => p.path === path)
+    // ⚠️ Console.vue 读的是 state.currentPage（响应式）；只写 this.currentPage 是断的，
+    //    跳页会静默失效（用户主页点板块不跳转的根因）
     this.currentPage = path
+    this.state.currentPage = path
     if (!hit) return false
     return true
   }

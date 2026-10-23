@@ -55,10 +55,21 @@ function mountFileUrl(name: string) {
   return `${location.origin}/webdav/${gid}/@mount/${mid}/${p}?token=${encodeURIComponent(token)}`
 }
 
-/** 定位文件：挂载盘视图内高亮当前列表；否则跳群文件面板高亮 */
-function locateFile(name: string) {
+/** 定位文件：挂载盘内高亮；云盘文件走 server /local-open（下载缓存 + 系统资源管理器选中） */
+async function locateFile(name: string) {
   if (g.state.mountView) { g.state.mountHighlight = name; return }
-  g.locateFile?.(name)
+  // 云盘视图：找到该文件条目，用它的 fileUrl 调本地打开
+  const f = (g.state.diskList || []).find((x: any) => x.name === name)
+  const url = f?.fileUrl ? resUrl(f.fileUrl) : ''
+  if (!url) { g.locateFile?.(name); return }
+  try {
+    const r = await fetch('/local-open', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url, name }),
+    })
+    const j = await r.json().catch(() => null)
+    if (!j?.ok) ctx.ui?.toast?.('打开失败：' + (j?.msg || r.status), 'error')
+  } catch (e: any) { ctx.ui?.toast?.('打开失败：' + e.message, 'error') }
 }
 
 /** 群网盘重命名（/v1/disk/rename，审计补齐 UI；内联输入框，不用原生 prompt） */

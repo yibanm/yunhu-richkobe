@@ -23,7 +23,10 @@ const editing = ref<any>(null)
 
 const TABS: Array<[string, number]> = [['我的', 3], ['全部', 4], ['热门', 2], ['关注', 1]]
 
-onMounted(() => cm.load(3))
+onMounted(() => { cm.load(3); cm.loadFollows?.() })
+
+const isFollowed = (id: number) => !!cm.isFollowed?.(id)
+async function toggleFollow(b: any) { await cm.toggleFollow?.(b) }
 
 async function switchTab(t: any) {
   tab.value = t[0] === '我的' ? 'mine' : t[0] === '全部' ? 'all' : t[0] === '热门' ? 'hot' : 'follow'
@@ -81,6 +84,9 @@ async function create() {
           <!-- 手机上一行放不下：这组按钮单独一个容器，横向可滑，不再被压扁 -->
           <div class="acts">
             <button class="small" @click="cm.enter(b)">进入板块</button>
+            <button class="ghost small" :class="{ on: isFollowed(b.id) }" @click="toggleFollow(b)">
+              {{ isFollowed(b.id) ? '已关注' : '关注' }}
+            </button>
             <button class="ghost small" @click="cm.loadGroups(b)">绑定群聊</button>
             <button class="ghost small" @click="editing = { ...b }">编辑</button>
             <button class="ghost small" @click="cm.manage(b.id, 0, 0)">设为公开</button>
@@ -153,7 +159,10 @@ async function create() {
                 {{ p.senderName || p.senderId }} · {{ fmtTime(p.createTime) }} · 赞 {{ p.likeNum }} · 评论 {{ p.commentNum }}
               </div>
             </div>
-            <p v-if="!s.posts.length" class="dim center">{{ s.loadingPosts ? '加载中…' : '这个板块还没有文章' }}</p>
+            <div v-if="s.posts.length" class="row" style="justify-content:center">
+          <button class="ghost small" :disabled="s.loadingPosts" @click="cm.loadMorePosts()">加载更多文章</button>
+        </div>
+        <p v-if="!s.posts.length" class="dim center">{{ s.loadingPosts ? '加载中…' : '这个板块还没有文章' }}</p>
           </template>
         </div>
       </div>

@@ -217,7 +217,6 @@ function qrDrop(targetId: string) {
           {{ p.name }} <em>{{ p.items?.length || 0 }}</em>
         </button>
         <span class="grow"></span>
-        <button class="ghost tiny" title="输入表情包 ID 收藏到账号" @click="addPackOpen = !addPackOpen">+ 收藏表情包</button>
         <span v-if="s.packsLoading" class="dim small">加载表情包…</span>
       </div>
       <!-- 聊天点表情但该合集未收藏时的提示条 -->
@@ -244,7 +243,7 @@ function qrDrop(targetId: string) {
           <template v-if="tab === 'fav'">
             <button v-for="e in list" :key="e.id" class="cell" :title="'点击发送 · 右键更多'"
                     @click="st.send(e)" @contextmenu.prevent="askFav(e, $event)">
-              <img :src="src(e)" loading="lazy" alt=""
+              <img :src="src(e)" alt=""
                    @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
               <span class="cell-name" :title="nameOf(e)">{{ nameOf(e) }}</span>
               <span class="top" @click.stop="st.topping(e)" title="置顶">↑</span>
@@ -258,7 +257,7 @@ function qrDrop(targetId: string) {
           <template v-else>
             <button v-for="e in packItems" :key="e.id" class="cell" :title="'点击发送 · 右键更多'"
                     @click="st.send(e)" @contextmenu.prevent="askFav(e, $event)">
-              <img :src="src(e)" loading="lazy" alt=""
+              <img :src="src(e)" alt=""
                    @error="(ev: any) => { ev.target.style.visibility = 'hidden' }" />
               <span class="cell-name" :title="nameOf(e)">{{ nameOf(e) }}</span>
               <!-- 右键小菜单：收藏 / 重命名 -->

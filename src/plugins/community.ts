@@ -42,12 +42,14 @@ export const communityPlugin = {
       list: [] as any[],
       mine: [] as any[],
       myIds: [] as number[],
+      followIds: [] as number[],
       loading: false,
       groups: [] as any[],
       groupsOf: null as any,
       bindGroupId: '',
       viewing: null as any,       // 正在浏览的板块
-      posts: [] as any[],         // 该板块的文章
+      posts: [] as any[],
+      postPage: 1,         // 该板块的文章
       postDetail: null as any,    // 文章详情
       loadingPosts: false,
       info: null as any,
@@ -128,6 +130,7 @@ export const communityPlugin = {
       state.viewing = ba
       state.posts = []
       state.postDetail = null
+      state.postPage = 1
       state.loadingPosts = true
       try {
         state.info = await api.baInfo(ba.id).catch(() => null)
@@ -141,8 +144,28 @@ export const communityPlugin = {
     async function openPost(p: any) {
       try {
         const d = await api.baPostDetail(p.id)
-        state.postDetail = d || p
-      } catch (e: any) { ui.toast('文章打不开：' + e.message, 'error') }
+        // 详情可能嵌套在 post 里；都没有则回退列表项自带 content
+        const detail = d?.post ? { ...d, content: d.post.content ?? d.content, title: d.post.title ?? d.title } : d
+        state.postDetail = detail?.content || detail?.title ? detail : (p.content || p.title ? p : detail)
+      } catch (e: any) {
+        // 详情接口失败时回退列表项内容，不让用户看空弹窗
+        if (p.content || p.title) { state.postDetail = p; ui.toast('详情接口失败，显示列表缓存内容', 'warn') }
+        else ui.toast('文章打不开：' + e.message, 'error')
+      }
+    }
+
+    /** 板块文章分页加载更多 */
+    async function loadMorePosts() {
+      const ba = state.viewing
+      if (!ba || state.loadingPosts) return
+      state.postPage = (state.postPage || 1) + 1
+      state.loadingPosts = true
+      try {
+        const more = await api.baPosts(ba.id, { size: 30, page: state.postPage })
+        const ids = new Set(state.posts.map((x: any) => x.id))
+        state.posts = [...state.posts, ...more.filter((x: any) => !ids.has(x.id))]
+      } catch (e: any) { ui.toast('加载更多失败：' + e.message, 'error') }
+      finally { state.loadingPosts = false }
     }
 
     /** 上传板块头像：选图 → 上传 → 回填 URL（比手输 URL 友好） */
@@ -172,7 +195,22 @@ export const communityPlugin = {
       ctx.setTimeout(() => { enter(ba) }, 300)
     }
 
-    ctx.set('community', { state, load, mine, countOf, create, createWithAvatar, edit, manage, loadGroups, bindGroup, enter, exitBoard, openPost, uploadAvatar, focus })
+    /* ---- 关注（/v1/community/ba/user-follow-ba / unfollow） ---- */
+    async function loadFollows() {
+      try {
+        const list = await api.baList(1, { size: 50, page: 1 })
+        state.followIds = list.map((b: any) => b.id)
+      } catch { state.followIds = [] }
+    }
+    function isFollowed(id: number) { return state.followIds.includes(id) }
+    async function toggleFollow(b: any) {
+      try {
+        if (isFollowed(b.id)) { await api.unfollowBoard(b.id); state.followIds = state.followIds.filter((x: number) => x !== b.id); ui.toast('已取消关注', 'success') }
+        else { await api.followBoard(b.id); state.followIds = [...state.followIds, b.id]; ui.toast('已关注', 'success') }
+      } catch (e: any) { ui.toast('操作失败：' + e.message, 'error') }
+    }
+
+    ctx.set('community', { state, load, mine, countOf, create, createWithAvatar, edit, manage, loadGroups, bindGroup, enter, exitBoard, openPost, uploadAvatar, focus, loadFollows, isFollowed, toggleFollow, loadMorePosts })
 
     // 插件装载时可能还没登录完，接口会失败 → 服务就绪后补拉一次（不然「我的板块」一直是空的）
     ctx.on('auth/ready' as any, () => mine())

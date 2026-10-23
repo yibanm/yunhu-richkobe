@@ -96,7 +96,15 @@ function openVideo(src: string) {
   const u = mediaUrl(src, 'video')
   if (u) { viewer.value = { kind: 'video', url: u }; zoom.value = 1; pan.value = { x: 0, y: 0 } }
 }
-function closeViewer() { viewer.value = null }
+/** 视频全屏：CSS 伪全屏铺满灯箱（WebView2 里 Fullscreen API 常被拒），原生全屏作增强 */
+const videoFull = ref(false)
+function toggleVideoFull() {
+  videoFull.value = !videoFull.value
+  const v = viewerVideo.value
+  if (videoFull.value && v?.requestFullscreen) v.requestFullscreen().catch(() => {})
+  if (!videoFull.value && document.fullscreenElement) document.exitFullscreen().catch(() => {})
+}
+function closeViewer() { viewer.value = null; videoFull.value = false }
 
 /** 聊天里左键点表情 → 打开表情面板并定位到它所属合集（未收藏则提示可添加） */
 function openStickerPack(el: any) {
@@ -165,6 +173,28 @@ async function onMsgButton(el: any) {
   } catch { /* 回报失败不打断用户 */ }
 }
 
+/**
+ * 保存文件：下载到用户文件目录（默认 文档/yhchat/file，关于页可自定义）
+ * 并在系统资源管理器中定位选中。WebView2/Electron 里 <a download> 跨域不生效，
+ * 统一走 server 端下载，行为在所有壳里一致。
+ */
+async function saveFile(el: any) {
+  const url = mediaUrl(el.attrs.src, 'file')
+  const name = el.attrs.name || url.split('/').pop() || '文件'
+  try {
+    ctx.ui?.toast?.('保存中…', 'info')
+    const r = await fetch('/local-open', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url, name }),
+    })
+    const j = await r.json().catch(() => null)
+    if (!j?.ok) throw new Error(j?.msg || ('HTTP ' + r.status))
+    ctx.ui?.toast?.('已保存并在资源管理器中打开', 'success')
+  } catch (e: any) {
+    ctx.ui?.toast?.('保存失败：' + e.message, 'error')
+  }
+}
+
 async function fix() { await nextTick(); postProcess(body.value) }
 onMounted(fix)
 watch(() => props.elements, fix, { deep: true })
@@ -226,6 +256,10 @@ watch(() => props.elements, fix, { deep: true })
           <small v-if="el.attrs.size">{{ (el.attrs.size / 1024).toFixed(1) }} KB</small>
         </span>
       </a>
+      <!-- 保存按钮：WebView2 里 <a download> 跨域不生效，走 fetch blob 强制下载 -->
+      <button v-if="el.type === 'file'" class="file-save" title="保存到本地" @click.stop="saveFile(el)">
+        <Icon name="download" :size="14" /> 保存
+      </button>
 
       <!-- 云湖扩展 -->
       <button v-else-if="el.type === 'button'" class="msg-btn"
@@ -273,7 +307,7 @@ watch(() => props.elements, fix, { deep: true })
 
   <!-- 图片/视频灯箱：点空白收起；图片滚轮缩放+拖拽平移；视频可应用内全屏 -->
   <Teleport to="body">
-    <div v-if="viewer" class="viewer-mask" @click.self="closeViewer" @wheel.prevent="onWheel">
+    <div v-if="viewer" class="viewer-mask" :class="{ 'video-full': videoFull }" @click.self="closeViewer" @wheel.prevent="onWheel">
       <img v-if="viewer.kind === 'image'" :src="viewer.url" alt=""
            :style="{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }"
            class="viewer-img" @click.self="closeViewer"
@@ -286,7 +320,12 @@ watch(() => props.elements, fix, { deep: true })
           <button class="viewer-ctl" title="放大" @click="zoom = Math.min(8, zoom * 1.25)">＋</button>
           <button class="viewer-ctl" title="还原" @click="zoom = 1; pan = { x: 0, y: 0 }">1:1</button>
         </template>
-        <button v-else class="viewer-ctl" title="应用内全屏播放" @click="fullVideo">全屏</button>
+        <template v-else>
+          <!-- 全屏：CSS 伪全屏铺满灯箱（WebView2 里 Fullscreen API 常被拒），再试原生全屏作增强 -->
+          <button class="viewer-ctl" :title="videoFull ? '退出全屏' : '全屏播放'" @click="toggleVideoFull">
+            {{ videoFull ? '退出' : '全屏' }}
+          </button>
+        </template>
         <span class="grow"></span>
         <button class="viewer-ctl" title="关闭" @click="closeViewer">×</button>
       </div>
@@ -327,6 +366,19 @@ watch(() => props.elements, fix, { deep: true })
 .rich :deep(img) { max-width: 100%; border-radius: 8px; }
 .rich :deep(blockquote) { margin: 4px 0; padding-left: 8px; border-left: 3px solid var(--line); opacity: .85; }
 .media { max-width: min(320px, 100%); max-height: 460px; border-radius: 10px; display: block; object-fit: contain; cursor: zoom-in; background: var(--card2); }
+/* 文件气泡旁的保存按钮 */
+.file-save {
+  align-self: center; margin-left: 6px; padding: 4px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--card2); color: var(--fg2);
+  font-size: 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+}
+.file-save:hover { color: var(--acc); border-color: var(--acc); }
+/* markdown 消息行距收紧（用户反馈空太大） */
+.rich :deep(p) { margin: 2px 0; }
+.rich :deep(h1), .rich :deep(h2), .rich :deep(h3) { margin: 4px 0 2px; }
+.rich :deep(ul), .rich :deep(ol) { margin: 2px 0; padding-left: 20px; }
+.rich :deep(pre) { margin: 4px 0; }
+.rich :deep(blockquote) { margin: 4px 0; }
 /* 灯箱（Teleport 到 body，scoped 样式需 :deep 或直接写全局类） */
 .viewer-mask {
   position: fixed; inset: 0; z-index: 92; background: rgba(0, 0, 0, .82);
@@ -352,6 +404,12 @@ watch(() => props.elements, fix, { deep: true })
 }
 .viewer-ctl:hover { background: rgba(255, 255, 255, .24); }
 .viewer-zoom { color: rgba(255, 255, 255, .8); font-size: 12px; min-width: 42px; text-align: center; }
+/* 视频伪全屏：铺满灯箱（不依赖 Fullscreen API） */
+.viewer-mask.video-full video {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; max-width: none; max-height: none;
+  border-radius: 0; z-index: 93; background: #000; object-fit: contain;
+}
+.viewer-mask.video-full .viewer-bar { z-index: 94; }
 .sticker { max-width: 96px; max-height: 96px; display: block; object-fit: contain; }
 .video-wrap { display: inline-flex; flex-direction: column; gap: 3px; }
 .vtime { font-size: 11px; color: var(--fg2); }
