@@ -323,14 +323,20 @@ function qrDrop(targetId: string) {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 8px 12px; border-top: 1px solid var(--line); background: var(--card2);
 }
-/* 右键弹出的收藏按钮 */
-.fav-ask {
-  position: absolute; inset: auto 4px 4px auto; z-index: 3;
-  display: inline-flex; align-items: center; gap: 4px;
-  background: var(--acc); color: #fff; font-size: 11px;
-  padding: 3px 8px; border-radius: 999px; cursor: pointer;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, .4);
+/* 右键小菜单：深色浮层小条目（不继承全局紫色主按钮样式） */
+.fav-ask.menu {
+  position: absolute; inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 6; display: flex; flex-direction: column; gap: 2px; padding: 4px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 9px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .45); min-width: 76px;
 }
+.fav-ask.menu button {
+  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 5px 10px; border: none; border-radius: 6px;
+  background: transparent; color: var(--fg); font-size: 12px; font-weight: 400;
+  cursor: pointer; width: 100%; text-align: left;
+}
+.fav-ask.menu button:hover { background: var(--card2); color: var(--acc); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
 .cell { position: relative; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 9px; background: var(--card2); padding: 4px; cursor: pointer; overflow: hidden; }
 .cell:hover { border-color: var(--acc); }
