@@ -409,7 +409,7 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 /* ===================================================================
    Toast
    =================================================================== */
-.toasts { position: fixed; right: 16px; bottom: 40px; display: flex; flex-direction: column; gap: 8px; z-index: 99; }
+.toasts { position: fixed; right: 16px; bottom: 40px; display: flex; flex-direction: column; gap: 8px; z-index: 125; }
 .toast {
   background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--acc);
   padding: 10px 14px; border-radius: 9px; min-width: 200px; max-width: 340px;

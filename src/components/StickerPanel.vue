@@ -61,7 +61,7 @@ const bodyEl = ref<HTMLElement | null>(null)
 function scrollLocateIntoView() {
   nextTick(() => {
     const hit = bodyEl.value?.querySelector('.cell.located') as HTMLElement | null
-    hit?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    hit?.scrollIntoView({ block: 'center', behavior: 'auto' })
   })
 }
 // activeTab / locateSticker 变化（外部定位）后，等渲染完滚动到那张
@@ -346,7 +346,7 @@ function qrDrop(targetId: string) {
 .sp > header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
 .sp > header .grow { flex: 1; }
 .sp-x { background: transparent; color: var(--fg2); font-size: 20px; padding: 0 8px; line-height: 1; }
-.sp-body { overflow: auto; padding: 12px; }
+.sp-body { overflow: auto; padding: 12px; flex: 1 1 auto; min-height: 0; }
 .sp-tabs { display: flex; gap: 6px; padding: 8px 12px 0; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
 .sp-tab {
   padding: 5px 12px 7px; border: none; background: none; color: var(--fg2); font-size: 12.5px;

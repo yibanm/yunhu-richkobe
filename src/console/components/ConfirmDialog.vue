@@ -34,7 +34,7 @@ function answer(ok: boolean) {
 
 <style scoped>
 .cf-mask {
-  position: fixed; inset: 0; z-index: 98; background: rgba(0, 0, 0, .45);
+  position: fixed; inset: 0; z-index: 120; background: rgba(0, 0, 0, .45);
   display: grid; place-items: center; backdrop-filter: blur(3px);
 }
 .cf-box {

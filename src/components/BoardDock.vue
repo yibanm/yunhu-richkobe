@@ -122,7 +122,7 @@ async function jumpToMsg(r: any) {
   const highlight = () => nextTick(() => {
     const el = document.querySelector(`[data-mid="${r.id}"]`) as HTMLElement | null
     if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.scrollIntoView({ block: 'center', behavior: 'auto' })
       el.classList.add('flash')
       setTimeout(() => el.classList.remove('flash'), 1500)
     }

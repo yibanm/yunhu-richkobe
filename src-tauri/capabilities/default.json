@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "云湖牢大版桌面端默认权限",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:default", "core:webview:default"]
+  "permissions": ["core:default", "core:window:default", "core:webview:default", "opener:default"]
 }

@@ -123,8 +123,9 @@ export function toText(elements: Element[] = []): string {
       case 'markdown': case 'html': return el.attrs.content ?? ''
       case 'at': return `@${el.attrs.name || el.attrs.id}`
       case 'a': return toText(el.children) || el.attrs.href || ''
-      case 'img': return el.attrs.src || ''
-      case 'audio': case 'video': return el.attrs.src || ''
+      case 'img': return '[图片]'
+      case 'audio': return '[语音]'
+      case 'video': return '[视频]'
       case 'file': return el.attrs.name || el.attrs.src || ''
       case 'sticker': return '[表情]'
       case 'br': return '\n'

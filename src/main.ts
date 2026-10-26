@@ -8,6 +8,23 @@ import './styles-m3.css'   // M3 质感层（Kazumi 式观感），必须后加�
 applyPlatformAttr(platform)
 enableRipple()
 
+/**
+ * 外链全局委托：Tauri（WebView2）里 target=_blank 的新窗口导航被默认拦截，
+ * 表现为「点网址没反应」。捕获阶段拦截所有 http(s) 外链点击，交 opener 插件用系统浏览器打开。
+ * web 版（无 __TAURI__）保持原生行为不动。
+ */
+document.addEventListener('click', (e) => {
+  const w = window as any
+  if (!w.__TAURI__?.opener?.openUrl) return
+  const a = (e.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null
+  if (!a) return
+  const href = a.getAttribute('href') || ''
+  if (!/^https?:\/\//i.test(href)) return
+  e.preventDefault()
+  e.stopPropagation()
+  w.__TAURI__.opener.openUrl(href).catch(() => { window.open(href, '_blank') })
+}, true)
+
 const app = createApp(App)
 app.provide('ctx', ctx)
 app.config.errorHandler = (err: any) => ctx.logger?.error('vue error:', err?.message || String(err))

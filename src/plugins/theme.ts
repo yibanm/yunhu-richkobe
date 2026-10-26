@@ -13,7 +13,7 @@
  *   · 自带「主题」控制台页面，配置写在 yunhu.config.yml → plugins.theme
  */
 import Schema from 'schemastery'
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue'
 import type { Context } from '../core/context'
 import ThemePage from '../console/pages/ThemePage.vue'
 
@@ -222,22 +222,32 @@ export const themePlugin = {
       const p = current()
       const accent = state.accent || p.accent
 
-      root.dataset.theme = p.mode
+      // ⚠️ 明暗三态（ui 的 dark/light/auto）优先于预设自带 mode：
+      //    旧代码无条件 root.dataset.theme = p.mode，用户手动切亮色后
+      //    预设一 apply 就被打回 dark（用户报「亮色模式变成深色模式」根因）。
+      const uiMode = (ctx as any).ui?.state?.theme || 'auto'
+      const sysDark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches
+      const effMode = uiMode === 'auto' ? (sysDark ? 'dark' : 'light') : uiMode
+      root.dataset.theme = effMode
+
       root.style.setProperty('--acc', accent)
-      root.style.setProperty('--acc2', shade(accent, p.mode === 'dark' ? -14 : -12))
-      root.style.setProperty('--acc-soft', alpha(accent, p.mode === 'dark' ? 0.16 : 0.1))
+      root.style.setProperty('--acc2', shade(accent, effMode === 'dark' ? -14 : -12))
+      root.style.setProperty('--acc-soft', alpha(accent, effMode === 'dark' ? 0.16 : 0.1))
       root.style.setProperty('--radius', state.radius + 'px')
 
       const setOrClear = (name: string, val?: string) => {
         if (val) root.style.setProperty(name, val)
         else root.style.removeProperty(name)
       }
-      setOrClear('--bg', p.bg)
-      setOrClear('--rail', p.rail)
-      setOrClear('--card', p.card)
-      setOrClear('--line', p.border)
-      setOrClear('--fg', p.fg)
-      setOrClear('--fg2', p.fg2)
+      // 预设颜色只在「预设 mode 与生效 mode 一致」时覆盖；不一致（如暗预设+用户切亮）
+      // 则清掉内联覆盖，让 styles.css 的 :root[data-theme='light'] 默认亮色变量生效
+      const presetMatches = p.mode === effMode
+      setOrClear('--bg', presetMatches ? p.bg : undefined)
+      setOrClear('--rail', presetMatches ? p.rail : undefined)
+      setOrClear('--card', presetMatches ? p.card : undefined)
+      setOrClear('--line', presetMatches ? p.border : undefined)
+      setOrClear('--fg', presetMatches ? p.fg : undefined)
+      setOrClear('--fg2', presetMatches ? p.fg2 : undefined)
 
       if (state.wallpaper) root.style.setProperty('--wallpaper', `url("${state.wallpaper}")`)
       else root.style.removeProperty('--wallpaper')
@@ -306,6 +316,15 @@ export const themePlugin = {
 
     // cordis 的 effect 回调必须返回一个「可销毁物」，卸载时自动执行
     ctx.effect(() => { apply(); return () => { /* 主题副作用随插件卸载回收 */ } })
+    // ui 明暗三态（dark/light/auto）或系统色变化时重跑 apply：
+    // 清/设预设内联颜色变量，让亮色真正生效（旧版两套主题系统不联动）
+    ctx.effect(() => {
+      const stop = watch(() => [(ctx as any).ui?.state?.theme, (ctx as any).ui?.effectiveTheme], () => apply())
+      const mq = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null
+      const onSys = () => apply()
+      mq?.addEventListener?.('change', onSys)
+      return () => { stop(); mq?.removeEventListener?.('change', onSys) }
+    })
     ctx.set('theme', theme)
     ctx.logger?.info(`theme 插件已加载（${current().name}）`)
 

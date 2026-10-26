@@ -166,7 +166,7 @@ export const apiPlugin = {
           pb.fBytes(5, encodeContent(content)),
           pb.fNum(6, contentType),
         ]
-        if (quoteId) parts.push(pb.fStr(8, quoteId))
+        if (quoteId) parts.push(pb.fStr(9, quoteId))   // ⚠️ 官方引用 id 字段=9（dump 实锤 32hex）；曾误写 8（那是 content 的 quote_msg_text 位）→ 引用概率失效
         assertOk(await request('/v1/msg/send-message', { body: pb.build(parts) }))
         return id
       },

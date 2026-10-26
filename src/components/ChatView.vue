@@ -99,7 +99,7 @@ async function jumpTo(mid: string) {
   const seek = (tries = 12) => {
     const el = document.querySelector(`[data-mid="${mid}"]`) as HTMLElement | null
     if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.scrollIntoView({ block: 'center', behavior: 'auto' })
       el.classList.add('flash')
       setTimeout(() => el.classList.remove('flash'), 2000)
       return

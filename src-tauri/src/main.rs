@@ -259,6 +259,9 @@ fn spawn_sidecar_monitor(app: AppHandle, res: PathBuf) {
 
 fn main() {
     let result = tauri::Builder::default()
+        // 外链（消息/文章里的 http(s) 链接）交系统默认浏览器：
+        // WebView2 对 target=_blank 的新窗口导航默认拦截，表现为「点网址没反应」
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![restart_sidecar])
         .setup(|app| {
             // 先 clone handle 再进闭包/线程，避免借用冲突

@@ -30,7 +30,7 @@ export function decodePush(bytes) {
     type: pb.num(d, 7),
     ts: pb.num(d, 8),
     recallTs: pb.num(d, 10),
-    quoteId: pb.str(d, 11),
+    quoteId: pb.str(d, 9),   // 官方引用 id 字段=9（dump 实锤）；曾读 11 → WS 推送的引用全丢
     seq: pb.num(d, 12),
     editTs: pb.num(d, 14),
   }
