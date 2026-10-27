@@ -13,6 +13,7 @@
   --acc: #5a8cf8;
   --acc2: #4478e8;
   --acc-soft: rgba(90, 140, 248, .14);
+  --on-acc: #ffffff;
   --ok: #3ec97e;
   --warn: #e0a94a;
   --err: #f2635f;
@@ -31,6 +32,7 @@
   --acc: #3f6fe0;
   --acc2: #3360c9;
   --acc-soft: rgba(63, 111, 224, .1);
+  --on-acc: #ffffff;
   --ok: #1f9d55;
   --warn: #b7791f;
   --err: #d94b47;
@@ -60,7 +62,7 @@ body {
 /* ---------- 基础控件 ---------- */
 button {
   border: 0; border-radius: calc(var(--radius, 10px) * .8); padding: 8px 14px; cursor: pointer;
-  background: var(--acc); color: #fff; font: inherit; font-weight: 500;
+  background: var(--acc); color: var(--on-acc, #fff); font: inherit; font-weight: 500;
   transition: background .15s, opacity .15s, border-color .15s;
 }
 button:hover { background: var(--acc2); }
@@ -79,6 +81,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--acc); box-shadow
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
 code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .dim { color: var(--fg2); }
+input::placeholder, textarea::placeholder { color: var(--fg2); opacity: 1; }
+a { color: var(--link, var(--acc)); text-underline-offset: 3px; }
+:root[data-theme='dark'] { color-scheme: dark; }
+:root[data-theme='light'] { color-scheme: light; }
 .small { font-size: 12.5px; }
 .mt { margin-top: 16px; } .mt-sm { margin-top: 10px; }
 .err { color: var(--err); } .warn { color: var(--warn); }
@@ -409,7 +415,7 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 /* ===================================================================
    Toast
    =================================================================== */
-.toasts { position: fixed; right: 16px; bottom: 40px; display: flex; flex-direction: column; gap: 8px; z-index: 125; }
+.toasts { position: fixed; right: max(16px, env(safe-area-inset-right)); top: max(16px, env(safe-area-inset-top)); bottom: auto; display: flex; flex-direction: column; gap: 8px; max-height: calc(100dvh - 32px); overflow-y: auto; z-index: 9999; }
 .toast {
   background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--acc);
   padding: 10px 14px; border-radius: 9px; min-width: 200px; max-width: 340px;
@@ -499,12 +505,10 @@ code.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, m
 :root[data-platform='web'] .chat-header,
 :root[data-platform='desktop'] .composer,
 :root[data-platform='web'] .composer {
-  background: color-mix(in srgb, var(--rail) 72%, transparent);
-  backdrop-filter: blur(28px) saturate(1.5);
-  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  background: var(--rail);
 }
 :root[data-platform='desktop'] .composer,
-:root[data-platform='web'] .composer { background: color-mix(in srgb, var(--card) 72%, transparent); }
+:root[data-platform='web'] .composer { background: var(--card); }
 :root[data-platform='desktop'] .k-card,
 :root[data-platform='web'] .k-card,
 :root[data-platform='desktop'] .more-menu,

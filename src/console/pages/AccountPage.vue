@@ -4,6 +4,7 @@ import { inject, computed, ref } from 'vue'
 import KLayout from '../components/KLayout.vue'
 import KCard from '../components/KCard.vue'
 import SettingsFrag from './SettingsPage.vue'
+import NotificationSettings from '../../components/NotificationSettings.vue'
 import { resUrl } from '../../core/res.js'
 import { fallbackAvatar } from '../../core/util.js'
 
@@ -83,6 +84,10 @@ loadCoins()
           {{ (c.num ?? c.amount ?? 0) >= 0 ? '+' : '' }}{{ c.num ?? c.amount ?? 0 }}
         </span>
       </div>
+    </KCard>
+
+    <KCard title="消息通知" class="mt">
+      <NotificationSettings />
     </KCard>
 
     <KCard title="外观" class="mt">

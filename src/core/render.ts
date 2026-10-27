@@ -32,8 +32,20 @@ export function postProcess(el: any) { fixResourceUrls(el) }
 
 /** 纯文本里的 URL 变成可点链接（已转义，安全） */
 export function linkify(text: string): string {
-  const esc = String(text ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
-  return esc.replace(/(https?:\/\/[^\s<>"']+)/g, u => `<a href="${u}" target="_blank" rel="noreferrer">${u}</a>`)
+  const escape = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+  const raw = String(text ?? '')
+  const matches = raw.matchAll(/(?:https?:\/\/|www\.)[^\s<>"'，。！？、；：）】》]+/gi)
+  let out = '', start = 0
+  for (const match of matches) {
+    const index = match.index!
+    let url = match[0].replace(/[.,;!?]+$/, '')
+    while (url.endsWith(')') && (url.match(/\)/g)?.length || 0) > (url.match(/\(/g)?.length || 0)) url = url.slice(0, -1)
+    out += escape(raw.slice(start, index))
+    const href = /^www\./i.test(url) ? 'https://' + url : url
+    out += `<a href="${escape(href)}" target="_blank" rel="noopener noreferrer">${escape(url)}</a>`
+    start = index + url.length
+  }
+  return out + escape(raw.slice(start))
 }
 
 /* =====================  A2UI  ===================== */

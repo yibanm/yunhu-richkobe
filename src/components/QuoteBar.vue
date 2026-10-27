@@ -4,6 +4,7 @@
  * 引用态存在 chat.state.reply，发送时作为 quoteId 带上；点 × 清掉。
  */
 import { inject } from 'vue'
+import { resUrl } from '../core/res'
 
 const ctx = inject<any>('ctx')
 const chat = ctx.chat
@@ -12,6 +13,7 @@ const chat = ctx.chat
 <template>
   <div class="quotebar" v-if="chat.state.reply">
     <span class="qb-ico">↩</span>
+    <img v-if="chat.state.reply.image" class="qb-thumb" :src="resUrl(chat.state.reply.image)" alt="引用图片" />
     <div class="qb-main">
       <b>{{ chat.state.reply.sender }}</b>
       <span class="qb-text">{{ chat.state.reply.preview }}</span>
@@ -27,6 +29,7 @@ const chat = ctx.chat
   border-left: 3px solid var(--acc);
 }
 .qb-ico { color: var(--acc); font-size: 15px; }
+.qb-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; flex-shrink: 0; }
 .qb-main { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
 .qb-text { color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qb-x { background: transparent; color: var(--fg2); padding: 0 6px; font-size: 16px; line-height: 1; }

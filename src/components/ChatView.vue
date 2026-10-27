@@ -50,7 +50,7 @@ function toggleMore() {
   if (r) {
     const w = 170
     morePos.value = {
-      top: Math.min(r.bottom + 6, window.innerHeight - 400) + 'px',
+      top: Math.max(8, Math.min(r.bottom + 6, window.innerHeight - 400)) + 'px',
       left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px',
     }
   }
@@ -88,50 +88,37 @@ async function pickMenu(item: any) {
   catch (e: any) { ctx.ui?.toast('操作失败：' + e.message, 'error') }
 }
 
-/** 点引用跳到被引用的消息（含窗口外：messagesAround 拉上下文后高亮）。
- *  ⚠️ 用户反馈「二次跳转大概率失败」：大量消息重渲染后单个 nextTick DOM 常未就位，
- *     改用轮询查找（最多 ~1s）+ 命中即滚动高亮，避免静默失败。 */
-async function jumpTo(mid: string) {
-  const cur = chat.state.current
-  if (!cur || !mid) return
-  chat.state.locateId = mid          // 持续色块指示（无论本地命中还是拉取）
-  chat.state.jumpedAway = true
+/** 引用和通知共用 chat.locate；这里只负责等 DOM 就绪并高亮。 */
+function jumpTo(mid: string) {
+  if (cur.value && mid) chat.locate(cur.value, mid)
+}
+function seekLocated(mid: string) {
+  const current = chat.state.current
+  const request = ++jumpRequest
   const seek = (tries = 12) => {
-    const el = document.querySelector(`[data-mid="${mid}"]`) as HTMLElement | null
+    if (unmounted || request !== jumpRequest || chat.state.current !== current || chat.state.locateId !== mid) return
+    const el = box.value?.querySelector(`[data-mid="${CSS.escape(mid)}"]`) as HTMLElement | null
     if (el) {
       el.scrollIntoView({ block: 'center', behavior: 'auto' })
       el.classList.add('flash')
       setTimeout(() => el.classList.remove('flash'), 2000)
       return
     }
-    if (tries > 0) setTimeout(() => seek(tries - 1), 80)   // DOM 还没渲染出来，稍后重试
+    if (tries > 0) setTimeout(() => seek(tries - 1), 80)
     else ctx.ui?.toast?.('没能定位到这条消息（可能已删除或过旧）', 'warn')
   }
-  // ① 本地已有
-  if (chat.state.messages.some((m: any) => m.id === mid)) { nextTick(() => seek()); return }
-  // ② 拉被引用消息的上下文窗口（seq 未知传 -1=uint64max，官方语义）
-  try {
-    const around = await ctx.api.messagesAround(cur.id, cur.type, mid, 30, -1)
-    if (around.length && around.some((m: any) => m.id === mid)) {
-      chat.state.messages = around
-      nextTick(() => seek())
-      return
-    }
-  } catch { /* 落到 ③ */ }
-  // ③ 兜底提示：跳转失败，定位态与「回到最新」按钮都要清掉（否则按钮空挂）
-  chat.state.locateId = null
-  chat.state.jumpedAway = false
-  ctx.ui?.toast('被引用的消息拉取失败或已删除', 'warn')
+  nextTick(() => seek())
 }
 
-function toBottom() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
+function toBottom() { nextTick(() => { if (box.value && !chat.state.jumpedAway) box.value.scrollTop = box.value.scrollHeight }) }
 
 /** 搜索跳转历史后一键回最新：重载最新消息并滚到底 */
 async function backLatest() {
+  const current = chat.state.current
   chat.state.jumpedAway = false
   showJump.value = false
   await chat.loadMessages()
-  toBottom()
+  if (chat.state.current === current) toBottom()
 }
 
 /** 滚动时上报「是否贴底」：新消息/轮询刷新只在贴底时自动滚，翻历史不被打断 */
@@ -146,11 +133,12 @@ function onScroll() {
   // 历史消息自动加载：滚到顶部即拉上一页（QQ 式，不再需要点按钮），并保持阅读位置
   if (el.scrollTop < 40 && chat.state.hasMore && !chat.state.loadingMore && !loadingTop) {
     loadingTop = true
+    const current = chat.state.current
     const prevH = el.scrollHeight
     const topBefore = el.scrollTop
     Promise.resolve(chat.loadMore()).finally(() => {
       nextTick(() => {
-        el.scrollTop = el.scrollHeight - prevH + topBefore
+        if (!unmounted && chat.state.current === current && box.value === el) el.scrollTop = el.scrollHeight - prevH + topBefore
         loadingTop = false
       })
     })
@@ -170,10 +158,22 @@ function fmtDiv(ts: number) {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${hm}`
 }
 const off = ctx.on('chat/scroll-bottom', toBottom)
-onUnmounted(() => off())
-// 点空白关掉 ⋮ 菜单
+const offLocate = ctx.on('chat/locate', seekLocated)
+let unmounted = false
+let jumpRequest = 0
 const offDoc = () => closeMore()
-watch(() => cur.value?.id, toBottom)
+const onEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') { closeMore(); closeMenu() } }
+document.addEventListener('click', offDoc)
+document.addEventListener('keydown', onEscape)
+onUnmounted(() => {
+  unmounted = true
+  off()
+  offLocate()
+  document.removeEventListener('click', offDoc)
+  document.removeEventListener('keydown', onEscape)
+})
+watch(cur, () => { jumpRequest++; closeMore(); closeMenu(); showJump.value = false; toBottom() })
+watch(() => chat.state.locateId, (mid) => { if (mid) seekLocated(mid) }, { immediate: true, flush: 'post' })
 </script>
 
 <template>
@@ -237,7 +237,7 @@ watch(() => cur.value?.id, toBottom)
 
   <div v-else ref="box" class="messages" @click="closeMenu(); closeMore()" @scroll="onScroll">
     <!-- 往上翻后右下角出现「回最新」箭头（QQ 式） -->
-    <button v-if="showJump" class="jump-latest" title="回到最新" @click="toBottom()">
+    <button v-if="showJump" class="jump-latest" title="回到最新" @click="chat.state.jumpedAway ? backLatest() : toBottom()">
       <Icon name="down" :size="16" />
     </button>
     <div v-if="chat.state.hasMore && chat.state.loadingMore" class="load-more">
@@ -255,7 +255,7 @@ watch(() => cur.value?.id, toBottom)
   <component v-for="(sl, i) in ctx.chat?.slotsOf?.('chat-before-composer') || []" :key="'bc' + i"
              :is="sl.component" v-bind="sl.props || {}" />
 
-  <Composer v-if="cur" :key="cur.id" />
+  <Composer v-if="cur" :key="cur.type + ':' + cur.id" />
 
   <component v-for="(sl, i) in ctx.chat?.slotsOf?.('global') || []" :key="'g' + i"
              :is="sl.component" v-bind="sl.props || {}" />
@@ -282,6 +282,7 @@ watch(() => cur.value?.id, toBottom)
   position: fixed; z-index: 78; min-width: 170px;
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: var(--shadow); padding: 5px;
+  max-height: calc(100vh - 16px); overflow-y: auto;
 }
 .more-item {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;

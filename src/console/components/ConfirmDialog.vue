@@ -2,7 +2,7 @@
 /**
  * ConfirmDialog —— 统一 web 确认框（替代 window.confirm，避免原生框与 web UI 割裂）
  * 用法：const ok = await ctx.ui.confirm('标题', '正文')
- * 全局单例，z-index 最高档（98），任何弹窗之上。
+ * 全局单例，通过 Teleport 放在资料面板与消息菜单之上。
  */
 import { inject, computed } from 'vue'
 import Icon from './Icon.vue'
@@ -18,8 +18,9 @@ function answer(ok: boolean) {
 </script>
 
 <template>
+  <Teleport to="body">
   <div v-if="req" class="cf-mask" @click.self="answer(false)">
-    <div class="cf-box">
+    <div class="cf-box" role="dialog" aria-modal="true" :aria-label="req.title">
       <div class="cf-title">{{ req.title }}</div>
       <div v-if="req.message" class="cf-msg">{{ req.message }}</div>
       <div class="cf-row">
@@ -30,11 +31,12 @@ function answer(ok: boolean) {
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <style scoped>
 .cf-mask {
-  position: fixed; inset: 0; z-index: 120; background: rgba(0, 0, 0, .45);
+  position: fixed; inset: 0; z-index: 150; background: rgba(0, 0, 0, .45);
   display: grid; place-items: center; backdrop-filter: blur(3px);
 }
 .cf-box {

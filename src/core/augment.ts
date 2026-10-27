@@ -49,6 +49,7 @@ declare module 'cordis' {
     'auth/ready': (...args: any[]) => void
     'chat/open': (...args: any[]) => void
     'chat/incoming': (...args: any[]) => void
+    'chat/locate': (...args: any[]) => void
     'chat/reply': (...args: any[]) => void
     'chat/scroll-bottom': (...args: any[]) => void
     'chat/selection': (...args: any[]) => void

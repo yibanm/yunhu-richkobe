@@ -44,7 +44,7 @@ async function pickUpload(e: any, target: 'wallpaper' | 'sticker') {
     <template #actions>
       <button class="ghost small" @click="theme.reset()">恢复默认</button>
       <button class="ghost small" @click="ui.toggleTheme()">
-        深色 / 浅色（当前 {{ ui.state.theme === 'dark' ? '深色' : '浅色' }}）
+        深色 / 浅色（当前 {{ ui.state.theme === 'auto' ? '跟随系统 · ' : '' }}{{ ui.effectiveTheme === 'dark' ? '深色' : '浅色' }}）
       </button>
     </template>
 

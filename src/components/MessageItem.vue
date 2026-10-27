@@ -3,7 +3,7 @@
  * 单条消息：头像 + 元信息 + 元素树
  * 交互：右键/长按/「⋯」呼出上下文菜单；多选态下显示勾选框并支持点击选中
  */
-import { inject, computed, ref } from 'vue'
+import { inject, computed, ref, watch } from 'vue'
 import { fmtTime, fmtFullTime, fallbackAvatar } from '../core/util'
 import { resUrl } from '../core/res'
 import { parse } from '../satori/element'
@@ -34,8 +34,8 @@ const quote = computed(() => {
   const qid = props.msg.quoteId || props.msg.content?.quote_msg_id
   if (!qid) return null
   const hit = (chat.state.messages || []).find((m: any) => m.id === qid)
-  if (hit) return { id: qid, sender: hit.sender, preview: chat.previewOf(hit) }
-  if (remoteQuote.value?.id === qid) return { id: qid, sender: remoteQuote.value.sender, preview: remoteQuote.value.preview }
+  if (hit) return chat.quoteOf(hit)
+  if (remoteQuote.value?.id === qid) return remoteQuote.value
   const t = props.msg.content?.quote_msg_text
   if (t) {
     const i = String(t).indexOf(':')
@@ -46,21 +46,15 @@ const quote = computed(() => {
   }
   return { id: qid, sender: '', preview: '引用的消息不在本地记录中' }
 })
-// 本地缺失且无回退文本 → 后台补拉单条（messagesAround count=1 锚定该消息）
-if (props.msg.quoteId || props.msg.content?.quote_msg_id) {
-  const qid = props.msg.quoteId || props.msg.content?.quote_msg_id
-  const inLocal = (chat.state.messages || []).some((m: any) => m.id === qid)
-  const hasFallback = !!props.msg.content?.quote_msg_text
-  if (!inLocal && !hasFallback) {
-    const cur = chat.state.current
-    ctx.api?.messagesAround?.(cur?.id, cur?.type, qid, 1, -1)
-      .then((arr: any[]) => {
-        const hit = (arr || []).find((m: any) => m.id === qid)
-        if (hit) remoteQuote.value = { id: qid, sender: hit.sender, preview: chat.previewOf(hit) }
-      })
-      .catch(() => { /* 拉不到保持回退文案 */ })
-  }
-}
+// 引用目标变更或组件重用时重新取摘要；同一引用的远端请求由服务缓存合并。
+watch([() => props.msg.quoteId || props.msg.content?.quote_msg_id, () => chat.state.current], async ([qid], _old, onCleanup) => {
+  let stale = false
+  onCleanup(() => { stale = true })
+  remoteQuote.value = null
+  if (!qid) return
+  const summary = await chat.getQuote(qid)
+  if (!stale) remoteQuote.value = summary
+}, { immediate: true })
 
 const isTip = computed(() => props.msg.type === 9 && !props.msg.recalled)
 /** 搜索定位目标：持续色块指示（引用式高亮框），直到回最新/切会话 */

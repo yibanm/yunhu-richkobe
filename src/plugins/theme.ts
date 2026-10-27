@@ -16,6 +16,7 @@ import Schema from 'schemastery'
 import { reactive, watch } from 'vue'
 import type { Context } from '../core/context'
 import ThemePage from '../console/pages/ThemePage.vue'
+import { themePalette } from '../core/theme-colors'
 
 export interface ThemePreset {
   id: string
@@ -73,7 +74,6 @@ const NEON_CSS_DARK = `
 .chat-header .t, .k-title h2 { text-shadow: 0 0 10px #ff33ff; }
 .bubble { text-shadow: 0 0 6px rgba(255,51,255,.55); }
 .row.right .bubble { text-shadow: 0 0 6px rgba(255,255,255,.5); }
-button { color: #fff; text-shadow: 0 0 5px #ff33ff, 0 0 10px #ff33ff; }
 .rail-logo { background: linear-gradient(135deg, #9700ff, #d20076); }
 .k-header, .statusbar { backdrop-filter: blur(6px); }
 .badge { box-shadow: 0 0 8px #ff33ff; }
@@ -126,7 +126,7 @@ export const PRESETS: ThemePreset[] = [
     id: 'doki-mai', name: 'Mai Dark', group: 'Doki · Bunny Senpai', mode: 'dark',
     accent: '#fee3cf', bg: '#25254B', rail: '#1c1c3c', card: '#242448', border: '#33335f', fg: '#e6e6ff', fg2: '#a0a0cf',
     sticker: DOKI_CDN + 'stickers/vscode/bunnySenpai/mai/mai_dark.png',
-    css: `.rail-logo { background: linear-gradient(135deg,#5b5bff,#fee3cf); } .row.right .bubble { color:#2a2a52; }`,
+    css: `.rail-logo { background: linear-gradient(135deg,#5b5bff,#fee3cf); }`,
   },
   {
     id: 'doki-nagatoro', name: 'Hayase Nagatoro', group: 'Doki · 不要欺负我', mode: 'dark',
@@ -179,7 +179,8 @@ export const themePlugin = {
   provide: ['theme'],
 
   apply(ctx: Context, config: any = {}) {
-    const saved = JSON.parse(localStorage.getItem('yh.theme.pref') || 'null') || {}
+    let saved: any = {}
+    try { saved = JSON.parse(localStorage.getItem('yh.theme.pref') || 'null') || {} } catch { /* 坏配置使用默认值 */ }
     const state = reactive({
       preset: migratePreset(saved.preset) || migratePreset(config.preset) || 'kobe',   // 旧默认「云湖蓝」迁移到「科比紫」
       accent: saved.accent || config.accent || '',
@@ -220,41 +221,31 @@ export const themePlugin = {
     function apply() {
       const root = document.documentElement
       const p = current()
-      const accent = state.accent || p.accent
+      const mode = ctx.ui.effectiveTheme as 'dark' | 'light'
+      const palette = themePalette(p, mode, state.accent)
+      const accent = palette.accent
 
-      // ⚠️ 明暗三态（ui 的 dark/light/auto）优先于预设自带 mode：
-      //    旧代码无条件 root.dataset.theme = p.mode，用户手动切亮色后
-      //    预设一 apply 就被打回 dark（用户报「亮色模式变成深色模式」根因）。
-      const uiMode = (ctx as any).ui?.state?.theme || 'auto'
-      const sysDark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches
-      const effMode = uiMode === 'auto' ? (sysDark ? 'dark' : 'light') : uiMode
-      root.dataset.theme = effMode
-
+      root.dataset.theme = mode
       root.style.setProperty('--acc', accent)
-      root.style.setProperty('--acc2', shade(accent, effMode === 'dark' ? -14 : -12))
-      root.style.setProperty('--acc-soft', alpha(accent, effMode === 'dark' ? 0.16 : 0.1))
+      root.style.setProperty('--acc2', shade(accent, mode === 'dark' ? -14 : -12))
+      root.style.setProperty('--acc-soft', alpha(accent, mode === 'dark' ? 0.16 : 0.1))
+      root.style.setProperty('--on-acc', palette.onAccent)
+      root.style.setProperty('--link', palette.link)
       root.style.setProperty('--radius', state.radius + 'px')
 
       const setOrClear = (name: string, val?: string) => {
         if (val) root.style.setProperty(name, val)
         else root.style.removeProperty(name)
       }
-      // 预设颜色只在「预设 mode 与生效 mode 一致」时覆盖；不一致（如暗预设+用户切亮）
-      // 则清掉内联覆盖，让 styles.css 的 :root[data-theme='light'] 默认亮色变量生效
-      const presetMatches = p.mode === effMode
-      setOrClear('--bg', presetMatches ? p.bg : undefined)
-      setOrClear('--rail', presetMatches ? p.rail : undefined)
-      setOrClear('--card', presetMatches ? p.card : undefined)
-      setOrClear('--line', presetMatches ? p.border : undefined)
-      setOrClear('--fg', presetMatches ? p.fg : undefined)
-      setOrClear('--fg2', presetMatches ? p.fg2 : undefined)
+      for (const key of ['bg', 'rail', 'card', 'card2', 'line', 'fg', 'fg2']) setOrClear('--' + key, palette[key])
+      setOrClear('--bubble', palette.card2)
 
       if (state.wallpaper) root.style.setProperty('--wallpaper', `url("${state.wallpaper}")`)
       else root.style.removeProperty('--wallpaper')
       root.style.setProperty('--wallpaper-blur', state.blur + 'px')
 
       // 附加 CSS
-      ensureStyle().textContent = p.css || ''
+      ensureStyle().textContent = palette.matching ? (p.css || '') : ''
 
       // 看板娘贴纸
       const stickerUrl = state.sticker || p.sticker || ''
@@ -277,7 +268,7 @@ export const themePlugin = {
       presets: PRESETS,
       current,
       apply,
-      setPreset(id: string) { state.preset = id; state.accent = ''; state.sticker = ''; apply() },
+      setPreset(id: string) { state.preset = id; state.accent = ''; state.sticker = ''; ctx.ui.setTheme(current().mode); apply() },
       setAccent(hex: string) { state.accent = hex; apply() },
       setWallpaper(url: string) { state.wallpaper = url; apply() },
       /** 本地图片上传到图床后设为壁纸（避免 base64 塞 localStorage） */
@@ -305,7 +296,7 @@ export const themePlugin = {
       setStickerOffset(x: string, y: string) { state.stickerX = x; state.stickerY = y; apply() },
       toggleSticker() { state.showSticker = !state.showSticker; apply() },
       reset() {
-        state.preset = 'yunhu'; state.accent = ''; state.wallpaper = ''
+        state.preset = 'kobe'; state.accent = ''; state.wallpaper = ''
         state.radius = 10; state.blur = 0
         state.sticker = ''; state.showSticker = true; state.stickerOpacity = 0.35
         apply()
@@ -315,15 +306,14 @@ export const themePlugin = {
     if (config.mode) (ctx as any).ui?.setTheme?.(config.mode)
 
     // cordis 的 effect 回调必须返回一个「可销毁物」，卸载时自动执行
-    ctx.effect(() => { apply(); return () => { /* 主题副作用随插件卸载回收 */ } })
-    // ui 明暗三态（dark/light/auto）或系统色变化时重跑 apply：
-    // 清/设预设内联颜色变量，让亮色真正生效（旧版两套主题系统不联动）
     ctx.effect(() => {
-      const stop = watch(() => [(ctx as any).ui?.state?.theme, (ctx as any).ui?.effectiveTheme], () => apply())
-      const mq = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null
-      const onSys = () => apply()
-      mq?.addEventListener?.('change', onSys)
-      return () => { stop(); mq?.removeEventListener?.('change', onSys) }
+      const stop = watch(() => ctx.ui.effectiveTheme, apply, { immediate: true, flush: 'sync' })
+      return () => {
+        stop()
+        document.getElementById('yh-theme-css')?.remove()
+        document.getElementById('yh-sticker')?.remove()
+        for (const key of ['acc', 'acc2', 'acc-soft', 'on-acc', 'link', 'radius', 'bg', 'rail', 'card', 'card2', 'line', 'fg', 'fg2', 'bubble', 'wallpaper', 'wallpaper-blur']) document.documentElement.style.removeProperty('--' + key)
+      }
     })
     ctx.set('theme', theme)
     ctx.logger?.info(`theme 插件已加载（${current().name}）`)

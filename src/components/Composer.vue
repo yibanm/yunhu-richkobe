@@ -1,19 +1,28 @@
 <script setup lang="ts">
-import { inject, ref, nextTick, computed, onUnmounted, watch } from 'vue'
+import { inject, ref, nextTick, computed, onUnmounted, toRefs } from 'vue'
 import QuoteBar from './QuoteBar.vue'
 import ImageEditor from './ImageEditor.vue'
 import { h } from '../satori/element'
 import Icon from '../console/components/Icon.vue'
 import { resUrl } from '../core/res'
 import { fallbackAvatar } from '../core/util'
+import type { PendingAttachment as Pending } from '../core/composer-drafts'
 
 const ctx = inject<any>('ctx')
 const chat = ctx.chat
 const quickreply = ctx.quickreply
 
-const text = ref('')
-const kind = ref(1)              // 1 文本 / 3 Markdown / 8 HTML
-const ta = ref(null)
+const target = chat.state.current
+const accountId = ctx.auth?.state.user?.id
+const draft = chat.drafts.get(target)
+const { text, kind, pending, uploading } = toRefs(draft)
+let disposed = false
+const isCurrent = () => !disposed && chat.state.current?.id === target.id && chat.state.current?.type === target.type
+  && ctx.auth?.state.user?.id === accountId
+onUnmounted(() => { disposed = true })
+
+// 1 文本 / 3 Markdown / 8 HTML
+const ta = ref<HTMLTextAreaElement | null>(null)
 const imgInput = ref<HTMLInputElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const audioInput = ref<HTMLInputElement | null>(null)
@@ -28,7 +37,10 @@ const videoInput = ref<HTMLInputElement | null>(null)
 const BAR_ORDER_KEY = 'yh.bar.order'
 const QR_ORDER_KEY = 'yh.qr.order'
 function loadOrder(key: string): string[] {
-  try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] }
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]')
+    return Array.isArray(value) ? value.filter((id) => typeof id === 'string') : []
+  } catch { return [] }
 }
 const barOrder = ref<string[]>(loadOrder(BAR_ORDER_KEY))
 const qrOrder = ref<string[]>(loadOrder(QR_ORDER_KEY))
@@ -73,15 +85,18 @@ function onInput() {
   ctx.commands?.openWith?.(kw)
 }
 
-ctx.on('commands/pick', (t: string) => {
+const offCommandPick = ctx.on('commands/pick', (t: string) => {
   text.value = t
   nextTick(() => { autoresize(); ta.value?.focus() })
 })
 /* 群面板「@ TA」等外部追加文本到输入框 */
-ctx.on('composer/append', (t: string) => {
+const offAppend = ctx.on('composer/append', (t: string) => {
   text.value += t
   nextTick(() => { autoresize(); ta.value?.focus() })
 })
+
+onUnmounted(() => { offCommandPick(); offAppend() })
+nextTick(autoresize)
 
 function onBar(it: any) {
   if (it.kind === 'type') { kind.value = it.value; return }
@@ -120,28 +135,8 @@ function autoresize() {
   el.style.height = Math.max(el.scrollHeight, manualMinH.value) + 'px'
 }
 
-/* ---------------- 待发送附件（暂存预览，不直接发送） ----------------
- * 暂存区按会话 id 存模块级 Map：切会话/组件重挂载都不丢（之前重挂载即清空，要重新上传）。
- */
-interface Pending {
-  id: number
-  file: File
-  url: string
-  kind: 'image' | 'video' | 'audio' | 'file'
-  caption: string        // 图片独立配文（发送时随图后发一条文本）
-  error: string          // 上次发送失败原因（保留在暂存区可重试）
-  /* 上传进度（0-1）与实时速度 MB/s，发送中显示进度条 */
-  progress: number
-  speed: number
-}
-const stagedByConv = new Map<string, Pending[]>()
-const pending = ref<Pending[]>([])
-let pendingSeq = 0
-const convId = computed(() => chat.state.current?.id || '')
-watch(convId, (id, oldId) => {
-  if (oldId) stagedByConv.set(oldId, pending.value)
-  pending.value = stagedByConv.get(id) || []
-}, { immediate: true })
+/* ---------------- 待发送附件：由 chat 服务保存，切会话保留草稿与预览 ---------------- */
+let pendingSeq = Math.max(Date.now(), ...pending.value.map((p) => p.id))
 
 function classify(f: File): Pending['kind'] {
   if (f.type.startsWith('image/')) return 'image'
@@ -157,26 +152,12 @@ function stage(f: File) {
   const k = classify(f)
   const url = (k === 'image' || k === 'video') ? URL.createObjectURL(f) : ''
   pending.value.push({ id: ++pendingSeq, file: f, url, kind: k, caption: '', error: '', progress: 0, speed: 0 })
-  if (convId.value) stagedByConv.set(convId.value, pending.value)
 }
 
 function unstage(p: Pending) {
   pending.value = pending.value.filter((x) => x.id !== p.id)
-  if (convId.value) stagedByConv.set(convId.value, pending.value)
   if (p.url) URL.revokeObjectURL(p.url)
 }
-
-/** 组件卸载释放全部 objectURL（之前漏了这条路径，切会话即泄漏） */
-onUnmounted(() => { for (const p of pending.value) if (p.url) URL.revokeObjectURL(p.url) })
-
-/* 登出清空暂存（Map 是模块级，跨账号会残留上一账号的附件）；
-   Composer 按会话挂载，监听器必须挂载/卸载配对，否则累积 */
-const offLogout = ctx.on('auth/logout', () => {
-  for (const list of stagedByConv.values()) for (const p of list) if (p.url) URL.revokeObjectURL(p.url)
-  stagedByConv.clear()
-  pending.value = []
-})
-onUnmounted(offLogout)
 
 /** 选择框支持多选：全部进暂存区 */
 async function onPick(e: any) {
@@ -225,31 +206,31 @@ async function stageLocalPath(p: string) {
     if (!r.ok) { ctx.ui?.toast?.('读取拖入文件失败：HTTP ' + r.status, 'error'); return }
     const name = decodeURIComponent(r.headers.get('x-file-name') || p.split(/[\\/]/).pop() || 'file')
     const blob = await r.blob()
-    stage(new File([blob], name, { type: blob.type || 'application/octet-stream' }))
+    if (isCurrent()) stage(new File([blob], name, { type: blob.type || 'application/octet-stream' }))
   } catch (e: any) { ctx.ui?.toast?.('读取拖入文件失败：' + e.message, 'error') }
 }
 const w = window as any
 if (w.__TAURI__?.event?.listen) {
   w.__TAURI__.event.listen('tauri://drag-drop', (ev: any) => {
     for (const p of ev?.payload?.paths || []) stageLocalPath(p)
-  }).then((off: () => void) => { offTauriDrop = off })
+  }).then((off: () => void) => { if (disposed) off(); else offTauriDrop = off })
 }
 onUnmounted(() => { offTauriDrop?.() })
 
 /* ---- 发送前图片编辑（裁剪/旋转/翻转） ---- */
 const editing = ref<Pending | null>(null)
-function openEditor(p: Pending) { if (p.kind === 'image') editing.value = p }
+function openEditor(p: Pending) { if (!uploading.value && !p.sent && p.kind === 'image') editing.value = p }
 function onEdited(f: File) {
   const p = editing.value
   editing.value = null
-  if (!p) return
+  if (!p || uploading.value || p.sent) return
+  p.elements = undefined
   if (p.url) URL.revokeObjectURL(p.url)
   p.file = f
   p.url = URL.createObjectURL(f)
   p.error = ''
 }
 
-const uploading = ref(false)
 const dragOver = ref(false)
 
 /** 上传进度回调：进度比例 + 实时速度 MB/s（约 0.4s 窗口平滑） */
@@ -287,65 +268,78 @@ function audioDurationOf(f: File): Promise<number> {
   })
 }
 
+/** 仅重试上传；消息发送超时可能已被服务器接收，不能自动重发整条消息。 */
+async function prepareAttachment(p: Pending) {
+  if (p.elements) return
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const onProg = progressOf(p)
+      if (p.kind === 'image') {
+        const { url } = await ctx.api.uploadAndUrl(p.file, 'image', onProg)
+        p.elements = [h.image(url)]
+      } else if (p.kind === 'video') {
+        const { key } = await ctx.api.uploadFile(p.file, 'video', onProg)
+        p.elements = [h.video(key, 0)]
+      } else if (p.kind === 'audio') {
+        const { key } = await ctx.api.uploadFile(p.file, 'audio', onProg)
+        p.elements = [h.audio(key, await audioDurationOf(p.file))]
+      } else {
+        const { url } = await ctx.api.uploadAndUrl(p.file, 'file', onProg)
+        p.elements = [h.file(url, p.file.name, p.file.size)]
+      }
+      return
+    } catch (err: any) {
+      const retryable = /abort|timeout|network|fetch|region|incorrect/i.test(err?.message || '')
+      if (attempt || !retryable || !isCurrent()) throw err
+      p.progress = 0; p.speed = 0
+    }
+  }
+}
+
 async function submit() {
-  if (uploading.value || chat.state.sending) return
-  const v = text.value.trim()
-  const todo = pending.value.filter((p) => !p.error || true)   // 含失败项一起重试
+  if (!isCurrent() || uploading.value || chat.state.sending) return
+  const originalText = text.value
+  const v = originalText.trim()
+  const contentKind = kind.value
+  const todo = [...pending.value]
   if (!v && !todo.length) return
   uploading.value = true
   let attachFailed = 0
   try {
-    for (const p of [...todo]) {
-      p.error = ''
-      p.progress = 0
-      p.speed = 0
-      // 网络类失败（abort/超时/七牛区域跳转等）同一次发送内自动重试一次——
-      // 用户报「文件要发两遍才上传得上去」：首败标红等手动重试体验太差
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const onProg = progressOf(p)
-          if (p.kind === 'image') {
-            const { url } = await ctx.api.uploadAndUrl(p.file, 'image', onProg)
-            await chat.sendMedia([h.image(url)])
-            if (p.caption.trim()) await chat.send(p.caption.trim(), 1)
-          } else if (p.kind === 'video') {
-            // 视频/音频发**裸 key**（服务端补域名）：发完整 URL 会被二次拼接损坏
-            const { key } = await ctx.api.uploadFile(p.file, 'video', onProg)
-            await chat.sendMedia([h.video(key, 0)])
-          } else if (p.kind === 'audio') {
-            const { key } = await ctx.api.uploadFile(p.file, 'audio', onProg)
-            // 手机端进度条依赖 f22 时长：读真实时长，0 会被 protobuf 省略字段
-            const secs = await audioDurationOf(p.file)
-            await chat.sendMedia([h.audio(key, secs)])
-          } else {
-            const { url } = await ctx.api.uploadAndUrl(p.file, 'file', onProg)
-            await chat.sendMedia([h.file(url, p.file.name, p.file.size)])
-          }
-          unstage(p)
-          break
-        } catch (err: any) {
-          const retryable = /abort|timeout|network|fetch|failed|region|incorrect|错误/i.test(err?.message || '')
-          if (attempt === 0 && retryable) { p.progress = 0; p.speed = 0; continue }
-          // 失败不丢附件：标红留在暂存区，下次点发送自动重试
-          p.error = err?.message || '上传失败'
-          p.progress = 0
-          p.speed = 0
-          attachFailed++
-          break
+    for (const p of todo) {
+      if (!isCurrent()) break
+      p.error = ''; p.progress = 0; p.speed = 0
+      try {
+        await prepareAttachment(p)
+        // 上传期间可能切换会话或退出登录，保留草稿，不向新会话发送。
+        if (!isCurrent()) break
+        if (!p.sent) {
+          await chat.sendMedia(p.elements)
+          p.sent = true
         }
+        if (p.caption.trim()) {
+          if (!isCurrent()) break
+          await chat.send(p.caption.trim(), 1)
+        }
+        unstage(p)
+      } catch (err: any) {
+        p.error = err?.message || '发送失败'
+        p.progress = 0; p.speed = 0
+        attachFailed++
       }
     }
-    if (v) {
-      // chat.send 失败时自己会 toast，这里不再重复弹
-      try { await chat.send(v, kind.value) } catch { /* 已提示 */ }
-      text.value = ''
+    if (v && isCurrent()) {
+      try {
+        await chat.send(v, contentKind)
+        // 失败不清空；等待上传/发送时新输入的内容也必须保留。
+        if (text.value === originalText) text.value = ''
+      } catch { /* chat.send 已提示，草稿保留 */ }
     }
     await nextTick()
-    autoresize()
+    if (isCurrent()) autoresize()
   } finally {
     uploading.value = false
-    // 失败 toast 带上真实原因（用户反馈：只说「发送失败」不知道为啥，超大小等要明说）
-    if (attachFailed) {
+    if (attachFailed && isCurrent()) {
       const firstErr = pending.value.find((x) => x.error)?.error || ''
       ctx.ui?.toast(`${attachFailed} 个附件发送失败${firstErr ? '：' + firstErr : ''}，已保留在待发送区，可重试`, 'error', 6000)
     }
@@ -377,12 +371,14 @@ function resetHeight() {
 }
 
 function onKey(e: KeyboardEvent) {
+  // 中文输入法 Enter 确认候选字时不能发送消息。
+  if (e.isComposing || e.keyCode === 229) return
   if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
     // @ 成员下拉打开时，Enter 选中当前高亮项而不是发送
     if (atOpen.value && atList.value.length) { e.preventDefault(); pickAt(atIdx.value); return }
     e.preventDefault(); submit()
   }
-  if (atOpen.value) {
+  if (atOpen.value && atList.value.length) {
     if (e.key === 'ArrowDown') { e.preventDefault(); atIdx.value = (atIdx.value + 1) % atList.value.length }
     if (e.key === 'ArrowUp') { e.preventDefault(); atIdx.value = (atIdx.value - 1 + atList.value.length) % atList.value.length }
     if (e.key === 'Escape') { atOpen.value = false }
@@ -491,8 +487,8 @@ function fmtSize(n: number) {
           <span class="spd">{{ p.speed.toFixed(1) }} MB/s</span>
         </div>
         <span v-if="p.error" class="pend-err" :title="p.error">发送失败：{{ p.error }} · 点发送重试</span>
-        <button class="pend-x" title="移除" @click="unstage(p)">×</button>
-        <input v-if="p.kind === 'image'" v-model="p.caption" class="pend-cap" placeholder="给这张图配一句话（可选）" />
+        <button class="pend-x" title="移除" :disabled="uploading" @click="unstage(p)">×</button>
+        <input v-if="p.kind === 'image'" v-model="p.caption" :disabled="uploading" class="pend-cap" placeholder="给这张图配一句话（可选）" />
       </div>
     </div>
 
@@ -569,7 +565,8 @@ function fmtSize(n: number) {
 .at-item.on { background: var(--acc-soft, var(--card2)); color: var(--acc); }
 
 /* 待发送附件预览 */
-.pending { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.pending { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; max-height: 26vh; overflow-y: auto; }
+.pending .pend { flex-shrink: 0; }
 .pend {
   position: relative; width: 84px; border-radius: 10px; overflow: hidden;
   border: 1px solid var(--line); background: var(--card2);

@@ -75,6 +75,17 @@ export function fixResourceUrls(root) {
   for (const attr of attrs) {
     for (const el of root.querySelectorAll(`[${attr}]`)) {
       const v = el.getAttribute(attr)
+      if (attr === 'href') {
+        // 普通网址/页内锚点不能当作图片 key 改写；仅代理明确的资源域名。
+        let link: URL
+        try { link = new URL(v) } catch { continue }
+        if (!/^https?:$/.test(link.protocol)) continue
+        if (!isResHost(link.host)) {
+          el.setAttribute('target', '_blank')
+          el.setAttribute('rel', 'noopener noreferrer')
+          continue
+        }
+      }
       const nv = resUrl(v)
       if (nv !== v) el.setAttribute(attr, nv)
     }

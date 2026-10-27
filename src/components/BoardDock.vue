@@ -114,41 +114,12 @@ async function setAdmin(m: any) {
   } catch (e: any) { ctx.ui?.toast?.('设置失败：' + e.message, 'error') }
 }
 
-/** 搜索结果点击跳转：三段回退（本地已有→messagesAround→重载全量），并置「回到最新」入口 */
+/** 搜索、引用与通知共用定位流程，避免慢请求覆盖新会话。 */
 async function jumpToMsg(r: any) {
-  const cur = chat.state.current
-  if (!cur || !r?.id) return
+  const current = chat.state.current
+  if (!current || !r?.id) return
   g.closeDock()
-  const highlight = () => nextTick(() => {
-    const el = document.querySelector(`[data-mid="${r.id}"]`) as HTMLElement | null
-    if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'auto' })
-      el.classList.add('flash')
-      setTimeout(() => el.classList.remove('flash'), 1500)
-    }
-  })
-  // ① 本地消息区已有这条 → 直接高亮
-  if (chat.state.messages.some((m: any) => m.id === r.id)) {
-    chat.state.jumpedAway = true
-    chat.state.locateId = r.id
-    highlight()
-    return
-  }
-  // ② 拉该消息前后上下文（seq 传搜索结果的 sequence，官方语义；拿不到传 -1=uint64max）
-  try {
-    const around = await ctx.api.messagesAround(cur.id, cur.type, r.id, 30, Number(r.seq) || -1)
-    if (around.length && around.some((m: any) => m.id === r.id)) {
-      chat.state.messages = around
-      chat.state.jumpedAway = true
-      chat.state.locateId = r.id          // 持续色块指示，直到下次 open/跳转
-      highlight()
-      return
-    }
-  } catch { /* 落到 ③ */ }
-  // ③ 兜底：重载最新消息列表并提示（不静默失败）
-  await chat.loadMessages(true)
-  chat.state.jumpedAway = false
-  ctx.ui?.toast?.('该消息不在最近 30 条内，已回到最新；可用「加载更多」往上翻', 'info')
+  await chat.locate(current, r.id)
 }
 
 /* ---- 成员「管理」弹窗（居中模态：发言权限/成员角色/其它操作分组，不再只是行内禁言小浮层） ---- */

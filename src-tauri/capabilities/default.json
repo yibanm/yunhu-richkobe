@@ -3,5 +3,6 @@
   "identifier": "default",
   "description": "云湖牢大版桌面端默认权限",
   "windows": ["main"],
+  "remote": { "urls": ["http://127.0.0.1:8902/*"] },
   "permissions": ["core:default", "core:window:default", "core:webview:default", "opener:default"]
 }

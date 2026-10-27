@@ -16,11 +16,12 @@ import { renderMarkdown, sanitizeHtml, postProcess, linkify, renderRich } from '
 import { analyzeA2ui } from '../satori/a2ui'
 import type { Element } from '../satori/element'
 import A2uiNode from './A2uiNode.vue'
+import Icon from '../console/components/Icon.vue'
 
 const props = defineProps<{
   elements: Element[]
   /** 引用块：{ sender, preview } */
-  quote?: { sender: string; preview: string; id?: string } | null
+  quote?: { sender: string; preview: string; id?: string; image?: string } | null
   /** 原始消息（自定义渲染器要用到） */
   msg?: any
 }>()
@@ -313,6 +314,7 @@ watch(() => props.elements, fix, { deep: true })
          @click.stop="quote.id && emit('quote-jump', quote.id)">
       <span class="q-bar"></span>
       <span class="q-name">{{ quote.sender }}</span>
+      <img v-if="quote.image" class="q-thumb" :src="resUrl(quote.image)" alt="引用图片" />
       <span class="q-text">{{ quote.preview }}</span>
     </div>
 
@@ -478,6 +480,7 @@ watch(() => props.elements, fix, { deep: true })
 .q-name { color: var(--acc); flex: 0 0 auto; }
 .q-text { color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quote.clickable { cursor: pointer; }
+.q-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
 .quote.clickable:hover { background: var(--acc-soft); }
 
 .at { color: var(--acc); background: var(--acc-soft); border-radius: 5px; padding: 0 4px; }
